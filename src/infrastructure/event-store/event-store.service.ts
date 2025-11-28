@@ -1,0 +1,90 @@
+import { Injectable, Optional } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEntity } from './event.entity';
+import { IEvent } from '@nestjs/cqrs';
+import { AggregateRoot } from '@domain/common/aggregate-root';
+import { KafkaPublisher } from '../adapters/kafka.publisher';
+
+@Injectable()
+export class EventStoreService {
+  constructor(
+    @InjectRepository(EventEntity)
+    private readonly eventRepository: Repository<EventEntity>,
+    private readonly eventEmitter: EventEmitter2,
+    @Optional()
+    private readonly kafkaPublisher?: KafkaPublisher,
+  ) {}
+
+  async save(aggregate: AggregateRoot): Promise<void> {
+    const events = aggregate.getUncommittedEvents();
+    if (events.length === 0) {
+      return;
+    }
+
+    const aggregateId = aggregate.id;
+    const currentVersion = await this.getCurrentVersion(aggregateId);
+
+    const eventEntities = events.map((event, index) => {
+      const entity = new EventEntity();
+      entity.aggregateId = aggregateId;
+      entity.eventType = event.constructor.name;
+      entity.payload = event;
+      entity.version = currentVersion + index + 1;
+      return entity;
+    });
+
+    await this.eventRepository.save(eventEntities);
+    aggregate.markEventsAsCommitted();
+
+    // Публикуем события для проекторов
+    for (const event of events) {
+      this.eventEmitter.emit(event.constructor.name, event);
+      // Публикуем в Kafka (если доступен)
+      if (this.kafkaPublisher) {
+        await this.kafkaPublisher.publish(event).catch((err) => {
+          console.error('Failed to publish event to Kafka:', err);
+        });
+      }
+    }
+  }
+
+  async getEvents(aggregateId: string): Promise<IEvent[]> {
+    const events = await this.eventRepository.find({
+      where: { aggregateId },
+      order: { version: 'ASC' },
+    });
+
+    return events.map((e) => this.deserializeEvent(e));
+  }
+
+  async getEventsByType(
+    eventType: string,
+    limit = 100,
+    offset = 0,
+  ): Promise<IEvent[]> {
+    const events = await this.eventRepository.find({
+      where: { eventType },
+      order: { createdAt: 'ASC' },
+      take: limit,
+      skip: offset,
+    });
+
+    return events.map((e) => this.deserializeEvent(e));
+  }
+
+  private async getCurrentVersion(aggregateId: string): Promise<number> {
+    const lastEvent = await this.eventRepository.findOne({
+      where: { aggregateId },
+      order: { version: 'DESC' },
+    });
+
+    return lastEvent?.version || 0;
+  }
+
+  private deserializeEvent(eventEntity: EventEntity): IEvent {
+    return eventEntity.payload as IEvent;
+  }
+}
+
