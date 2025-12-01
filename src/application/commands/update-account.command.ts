@@ -8,6 +8,8 @@ export class UpdateAccountCommand implements ICommand {
     public readonly roles?: string[],
     public readonly sources?: string[],
     public readonly passwordHash?: string, // Хеш пароля, если нужно изменить
+    public readonly requesterId?: string, // ID пользователя, выполняющего операцию
+    public readonly requesterRoles: string[] = [], // Роли пользователя, выполняющего операцию
   ) {}
 }
 

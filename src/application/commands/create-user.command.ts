@@ -7,6 +7,8 @@ export class CreateAccountCommand implements ICommand {
     public readonly password: string,
     public readonly roles: string[],
     public readonly sources: string[] = [],
+    public readonly requesterId?: string, // ID пользователя, выполняющего операцию
+    public readonly requesterRoles: string[] = [], // Роли пользователя, выполняющего операцию
   ) {}
 }
 

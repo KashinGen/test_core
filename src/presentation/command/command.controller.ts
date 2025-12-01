@@ -7,8 +7,10 @@ import {
   Param,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
+import { Request } from 'express';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
 import { ResetAccountPasswordDto } from '../dto/reset-account-password.dto';
@@ -24,6 +26,7 @@ import { GrantRoleCommand } from '@application/commands/grant-role.command';
 import { HydraMapper } from '../mappers/hydra.mapper';
 import { QueryBus } from '@nestjs/cqrs';
 import { GetUserByIdQuery } from '@application/queries/get-user-by-id.query';
+import { AuthorizationService } from '../authorization';
 
 @Controller('accounts')
 export class CommandController {
@@ -31,11 +34,13 @@ export class CommandController {
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
     private readonly hydraMapper: HydraMapper,
+    private readonly authService: AuthorizationService,
   ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() dto: CreateAccountDto) {
+  async create(@Body() dto: CreateAccountDto, @Req() req: Request) {
+    const user = this.authService.getUserFromRequest(req);
     const result = await this.commandBus.execute(
       new CreateAccountCommand(
         dto.name,
@@ -43,17 +48,22 @@ export class CommandController {
         dto.password,
         dto.roles,
         dto.sources || [],
+        user.id,
+        user.roles,
       ),
     );
     
     // Возвращаем созданный аккаунт в Hydra формате
-    const account = await this.queryBus.execute(new GetUserByIdQuery(result.id));
+    const account = await this.queryBus.execute(
+      new GetUserByIdQuery(result.id, user.id, user.roles),
+    );
     return this.hydraMapper.toMember(account);
   }
 
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
-  async update(@Param('id') id: string, @Body() dto: UpdateAccountDto) {
+  async update(@Param('id') id: string, @Body() dto: UpdateAccountDto, @Req() req: Request) {
+    const user = this.authService.getUserFromRequest(req);
     // Если передан password, нужно его захешировать
     let passwordHash: string | undefined;
     if (dto.password) {
@@ -69,18 +79,23 @@ export class CommandController {
         dto.roles,
         dto.sources,
         passwordHash,
+        user.id,
+        user.roles,
       ),
     );
 
     // Возвращаем обновленный аккаунт в Hydra формате
-    const account = await this.queryBus.execute(new GetUserByIdQuery(result.id));
+    const account = await this.queryBus.execute(
+      new GetUserByIdQuery(result.id, user.id, user.roles),
+    );
     return this.hydraMapper.toMember(account);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id') id: string) {
-    await this.commandBus.execute(new DeleteAccountCommand(id));
+  async delete(@Param('id') id: string, @Req() req: Request) {
+    const user = this.authService.getUserFromRequest(req);
+    await this.commandBus.execute(new DeleteAccountCommand(id, user.id, user.roles));
   }
 
   @Post('password/reset')
@@ -101,17 +116,23 @@ export class CommandController {
 
   @Patch(':id/approve')
   @HttpCode(HttpStatus.OK)
-  async approve(@Param('id') id: string) {
+  async approve(@Param('id') id: string, @Req() req: Request) {
+    const user = this.authService.getUserFromRequest(req);
     await this.commandBus.execute(new ApproveUserCommand(id));
-    const account = await this.queryBus.execute(new GetUserByIdQuery(id));
+    const account = await this.queryBus.execute(
+      new GetUserByIdQuery(id, user.id, user.roles),
+    );
     return this.hydraMapper.toMember(account);
   }
 
   @Patch(':id/block')
   @HttpCode(HttpStatus.OK)
-  async block(@Param('id') id: string) {
+  async block(@Param('id') id: string, @Req() req: Request) {
+    const user = this.authService.getUserFromRequest(req);
     await this.commandBus.execute(new BlockUserCommand(id));
-    const account = await this.queryBus.execute(new GetUserByIdQuery(id));
+    const account = await this.queryBus.execute(
+      new GetUserByIdQuery(id, user.id, user.roles),
+    );
     return this.hydraMapper.toMember(account);
   }
 
@@ -120,9 +141,13 @@ export class CommandController {
   async grantRole(
     @Param('id') id: string,
     @Body('roles') roles: string[],
+    @Req() req: Request,
   ) {
+    const user = this.authService.getUserFromRequest(req);
     await this.commandBus.execute(new GrantRoleCommand(id, roles));
-    const account = await this.queryBus.execute(new GetUserByIdQuery(id));
+    const account = await this.queryBus.execute(
+      new GetUserByIdQuery(id, user.id, user.roles),
+    );
     return this.hydraMapper.toMember(account);
   }
 }

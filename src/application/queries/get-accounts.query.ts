@@ -16,6 +16,8 @@ export class GetAccountsQuery implements IQuery {
     public readonly company?: string[],
     public readonly role?: string[],
     public readonly order?: GetAccountsOrder,
+    public readonly requesterId?: string, // ID пользователя, выполняющего запрос
+    public readonly requesterRoles: string[] = [], // Роли пользователя, выполняющего запрос
   ) {}
 }
 

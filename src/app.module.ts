@@ -13,6 +13,12 @@ import { PermissionRepository } from '@infrastructure/repos/permission.repositor
 import { UserDomainService } from '@domain/services/user-domain.service';
 import { KafkaPublisher } from '@infrastructure/adapters/kafka.publisher';
 import { HydraMapper } from '@presentation/mappers/hydra.mapper';
+import { GatewayAuthGuard } from '@presentation/guards/gateway-auth.guard';
+import { APP_GUARD } from '@nestjs/core';
+import {
+  AuthorizationService,
+  JwtExtractorService,
+} from '@presentation/authorization';
 
 // Commands
 import { CreateAccountHandler, CreateUserHandler } from '@application/commands/create-user.handler';
@@ -68,6 +74,8 @@ const QueryHandlers = [
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'core_db',
       entities: [EventEntity],
+      migrations: [__dirname + '/migrations/**/*.ts'],
+      migrationsRun: false, // Запускать миграции вручную
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
     }),
@@ -92,6 +100,12 @@ const QueryHandlers = [
     UserDomainService,
     KafkaPublisher,
     HydraMapper,
+    JwtExtractorService,
+    AuthorizationService,
+    {
+      provide: APP_GUARD,
+      useClass: GatewayAuthGuard,
+    },
   ],
 })
 export class AppModule {}

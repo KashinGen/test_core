@@ -30,6 +30,7 @@ KAFKA_BROKERS=localhost:9092
 # Application
 PORT=3000
 NODE_ENV=development
+GATEWAY_AUTH_TOKEN=super-secret-token
 ```
 
 ## 3. Запуск инфраструктуры через Docker

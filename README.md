@@ -140,8 +140,27 @@ docker-compose up -d
 
 ## Безопасность
 
-- Команды требуют JWT авторизации через Gateway
+- Команды доступны только при наличии заголовка `X-Gateway-Auth` с секретом, который знает gateway
 - Идемпотентность команд через `idempotencyKey`
 - Event Store только append (защита от подделки)
+
+## Инициализация первого администратора
+
+При первом запуске с пустой БД необходимо создать первого администратора. 
+Используйте TypeORM миграцию:
+
+```bash
+# 1. Установите переменные окружения (опционально)
+export ADMIN_EMAIL=admin@example.com
+export ADMIN_PASSWORD=YourSecurePassword123!
+export ADMIN_NAME="System Administrator"
+
+# 2. Выполните миграцию
+npm run migration:run
+```
+
+Или отредактируйте значения по умолчанию в `src/migrations/1735123456789-CreateInitialAdmin.ts` и выполните миграцию.
+
+Подробные инструкции см. в `scripts/README.md`
 
 
