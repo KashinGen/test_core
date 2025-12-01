@@ -11,13 +11,14 @@ import { UserReadModelRepository } from '@infrastructure/read-model/user-read-mo
 import { UserProjection } from '@infrastructure/read-model/user-projection';
 import { PermissionRepository } from '@infrastructure/repos/permission.repository';
 import { UserDomainService } from '@domain/services/user-domain.service';
-import { KafkaPublisher } from '@infrastructure/adapters/kafka.publisher';
 import { HydraMapper } from '@presentation/mappers/hydra.mapper';
 import { GatewayAuthGuard } from '@presentation/guards/gateway-auth.guard';
 import { APP_GUARD } from '@nestjs/core';
 import {
   AuthorizationService,
   JwtExtractorService,
+  RolesGuard,
+  SelfOrRolesGuard,
 } from '@presentation/authorization';
 
 // Commands
@@ -98,10 +99,11 @@ const QueryHandlers = [
     UserProjection,
     PermissionRepository,
     UserDomainService,
-    KafkaPublisher,
     HydraMapper,
     JwtExtractorService,
     AuthorizationService,
+    RolesGuard,
+    SelfOrRolesGuard,
     {
       provide: APP_GUARD,
       useClass: GatewayAuthGuard,

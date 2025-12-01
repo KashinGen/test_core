@@ -1,4 +1,4 @@
-import { QueryHandler, IQueryHandler } from '@nestjs/cqrs';
+import { QueryHandler, IQueryHandler, Logger } from '@nestjs/cqrs';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { GetUserByIdQuery } from './get-user-by-id.query';
 import { UserReadModelRepository } from '@infrastructure/read-model/user-read-model.repository';
@@ -8,6 +8,8 @@ import { Role } from '@presentation/authorization/roles.enum';
 
 @QueryHandler(GetUserByIdQuery)
 export class GetUserByIdHandler implements IQueryHandler<GetUserByIdQuery> {
+  private readonly logger = new Logger(GetUserByIdHandler.name);
+
   constructor(
     private readonly readModel: UserReadModelRepository,
     private readonly authService: AuthorizationService,
@@ -19,8 +21,12 @@ export class GetUserByIdHandler implements IQueryHandler<GetUserByIdQuery> {
       throw new NotFoundException('Account not found');
     }
 
-    // Проверка авторизации: ROLE_PLATFORM_ACCOUNT_RO или владелец
-    if (query.requesterId && query.requesterRoles.length > 0) {
+    // Базовая проверка ролей выполняется на уровне контроллера через RolesGuard
+    // Здесь проверяем только бизнес-логику: право владельца читать себя
+    
+    // RequesterId опционален для этого query (может быть вызван без аутентификации в некоторых случаях)
+    // Но если передан, проверяем права
+    if (query.requesterId && query.requesterRoles && query.requesterRoles.length > 0) {
       const requester = {
         id: query.requesterId,
         roles: query.requesterRoles.filter((r): r is Role =>
@@ -35,8 +41,15 @@ export class GetUserByIdHandler implements IQueryHandler<GetUserByIdQuery> {
       ]);
 
       if (!isOwner && !hasReadRole) {
+        this.logger.warn(
+          `Access denied: user ${requester.id} (roles: ${requester.roles.join(', ')}) tried to read account ${query.id}`,
+        );
         throw new ForbiddenException('Insufficient permissions to read account');
       }
+
+      this.logger.debug(
+        `Access granted: user ${requester.id} reading account ${query.id} (owner: ${isOwner})`,
+      );
     }
 
     return account;

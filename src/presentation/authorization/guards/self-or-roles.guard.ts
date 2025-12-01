@@ -10,17 +10,21 @@ import { Role } from '../roles.enum';
 import { REQUIRE_ROLES_KEY } from '../decorators/require-roles.decorator';
 import { JwtExtractorService } from '../services/jwt-extractor.service';
 import { RequestUser } from '../interfaces/request-user.interface';
+import { REQUEST_USER_KEY } from './roles.guard';
 import { BaseAuthGuard } from './base-auth.guard';
 
-export const REQUEST_USER_KEY = 'user';
-
+/**
+ * Guard для проверки прав на обновление аккаунта:
+ * - Пользователь может обновлять себя (self-update)
+ * - Или пользователь должен иметь одну из указанных ролей
+ */
 @Injectable()
-export class RolesGuard extends BaseAuthGuard implements CanActivate {
+export class SelfOrRolesGuard extends BaseAuthGuard implements CanActivate {
   constructor(
     reflector: Reflector,
     jwtExtractor: JwtExtractorService,
   ) {
-    super(reflector, jwtExtractor, RolesGuard.name);
+    super(reflector, jwtExtractor, SelfOrRolesGuard.name);
   }
 
   canActivate(context: ExecutionContext): boolean {
@@ -44,6 +48,19 @@ export class RolesGuard extends BaseAuthGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
+    // Получаем ID из параметров маршрута
+    const accountId = request.params?.id;
+    const isSelfUpdate = accountId && user.id === accountId;
+
+    // Если это self-update, разрешаем (детальная проверка будет в handler)
+    if (isSelfUpdate) {
+      this.logger.debug(
+        `Self-update allowed for user ${user.id} on account ${accountId}`,
+      );
+      return true;
+    }
+
+    // Если не self-update, проверяем роли
     const hasRole = requiredRoles.some((role) => user.roles.includes(role));
     if (!hasRole) {
       this.logger.warn(

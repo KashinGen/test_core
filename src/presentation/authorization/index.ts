@@ -4,5 +4,8 @@ export * from './services/jwt-extractor.service';
 export * from './services/authorization.service';
 export * from './decorators/require-roles.decorator';
 export * from './decorators/current-user.decorator';
+export * from './guards/base-auth.guard';
 export * from './guards/roles.guard';
+export * from './guards/self-or-roles.guard';
+export * from './constants/privileged-roles.constant';
 

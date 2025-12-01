@@ -24,9 +24,6 @@ REDIS_PORT=6379
 REDIS_PASSWORD=
 REDIS_DB=0
 
-# Kafka
-KAFKA_BROKERS=localhost:9092
-
 # Application
 PORT=3000
 NODE_ENV=development
@@ -42,8 +39,6 @@ docker-compose up -d
 Это запустит:
 - PostgreSQL (порт 5432)
 - Redis (порт 6379)
-- Zookeeper (порт 2181)
-- Kafka (порт 9092)
 
 ## 4. Запуск приложения
 
@@ -109,7 +104,7 @@ src/
 │  ├─ repos/            # Repository implementations
 │  ├─ event-store/      # Event Store
 │  ├─ read-model/       # Read model projections
-│  └─ adapters/         # Kafka, Redis adapters
+│  └─ adapters/         # Redis adapters
 └─ presentation/        # Presentation Layer
    ├─ command-controller/
    ├─ query-controller/
@@ -119,9 +114,9 @@ src/
 ## Особенности реализации
 
 1. **Event Store** - все команды сохраняют события в PostgreSQL
-2. **Read Model** - проекторы обновляют Redis асинхронно
-3. **Kafka** - события публикуются в Kafka для других сервисов
-4. **CQRS** - четкое разделение команд и запросов
-5. **Domain-Driven Design** - бизнес-логика в доменных сущностях
+2. **Read Model** - проекторы обновляют Redis асинхронно через EventEmitter2
+3. **CQRS** - четкое разделение команд и запросов
+4. **Domain-Driven Design** - бизнес-логика в доменных сущностях
+5. **Event Sourcing** - полная история изменений в Event Store
 
 

@@ -1,11 +1,10 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventEntity } from './event.entity';
 import { IEvent } from '@nestjs/cqrs';
 import { AggregateRoot } from '@domain/common/aggregate-root';
-import { KafkaPublisher } from '../adapters/kafka.publisher';
 
 @Injectable()
 export class EventStoreService {
@@ -13,8 +12,6 @@ export class EventStoreService {
     @InjectRepository(EventEntity)
     private readonly eventRepository: Repository<EventEntity>,
     private readonly eventEmitter: EventEmitter2,
-    @Optional()
-    private readonly kafkaPublisher?: KafkaPublisher,
   ) {}
 
   async save(aggregate: AggregateRoot): Promise<void> {
@@ -41,12 +38,6 @@ export class EventStoreService {
     // Публикуем события для проекторов
     for (const event of events) {
       this.eventEmitter.emit(event.constructor.name, event);
-      // Публикуем в Kafka (если доступен)
-      if (this.kafkaPublisher) {
-        await this.kafkaPublisher.publish(event).catch((err) => {
-          console.error('Failed to publish event to Kafka:', err);
-        });
-      }
     }
   }
 

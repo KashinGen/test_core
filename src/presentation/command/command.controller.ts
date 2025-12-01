@@ -7,10 +7,9 @@ import {
   Param,
   HttpCode,
   HttpStatus,
-  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { Request } from 'express';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
 import { ResetAccountPasswordDto } from '../dto/reset-account-password.dto';
@@ -26,21 +25,29 @@ import { GrantRoleCommand } from '@application/commands/grant-role.command';
 import { HydraMapper } from '../mappers/hydra.mapper';
 import { QueryBus } from '@nestjs/cqrs';
 import { GetUserByIdQuery } from '@application/queries/get-user-by-id.query';
-import { AuthorizationService } from '../authorization';
+import {
+  RolesGuard,
+  RequireRoles,
+  CurrentUser,
+  RequestUser,
+  Role,
+  SelfOrRolesGuard,
+} from '../authorization';
+import { Public } from '../guards/gateway-auth.guard';
 
 @Controller('accounts')
+@UseGuards(RolesGuard)
 export class CommandController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
     private readonly hydraMapper: HydraMapper,
-    private readonly authService: AuthorizationService,
   ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() dto: CreateAccountDto, @Req() req: Request) {
-    const user = this.authService.getUserFromRequest(req);
+  @RequireRoles(Role.ROLE_PLATFORM_ACCOUNT_RW, Role.ROLE_PLATFORM_ADMIN)
+  async create(@Body() dto: CreateAccountDto, @CurrentUser() user: RequestUser) {
     const result = await this.commandBus.execute(
       new CreateAccountCommand(
         dto.name,
@@ -62,8 +69,15 @@ export class CommandController {
 
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
-  async update(@Param('id') id: string, @Body() dto: UpdateAccountDto, @Req() req: Request) {
-    const user = this.authService.getUserFromRequest(req);
+  @RequireRoles(Role.ROLE_PLATFORM_ACCOUNT_RW, Role.ROLE_PLATFORM_ADMIN)
+  // SelfOrRolesGuard заменяет RolesGuard для этого метода, разрешая self-update
+  // Детальная проверка прав (ограничения для self-update) выполняется в UpdateAccountHandler
+  @UseGuards(SelfOrRolesGuard)
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateAccountDto,
+    @CurrentUser() user: RequestUser,
+  ) {
     // Если передан password, нужно его захешировать
     let passwordHash: string | undefined;
     if (dto.password) {
@@ -93,21 +107,21 @@ export class CommandController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id') id: string, @Req() req: Request) {
-    const user = this.authService.getUserFromRequest(req);
+  @RequireRoles(Role.ROLE_PLATFORM_ACCOUNT_RW, Role.ROLE_PLATFORM_ADMIN)
+  async delete(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     await this.commandBus.execute(new DeleteAccountCommand(id, user.id, user.roles));
   }
 
   @Post('password/reset')
   @HttpCode(HttpStatus.ACCEPTED)
+  @Public() // Публичный endpoint - не требует JWT
   async resetPassword(@Body() dto: ResetAccountPasswordDto) {
-    return this.commandBus.execute(
-      new ResetAccountPasswordCommand(dto.email),
-    );
+    return this.commandBus.execute(new ResetAccountPasswordCommand(dto.email));
   }
 
   @Post('password/change')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Public() // Публичный endpoint - не требует JWT (использует токен сброса)
   async changePassword(@Body() dto: ChangeAccountPasswordDto) {
     await this.commandBus.execute(
       new ChangeAccountPasswordCommand(dto.token, dto.password),
@@ -116,8 +130,8 @@ export class CommandController {
 
   @Patch(':id/approve')
   @HttpCode(HttpStatus.OK)
-  async approve(@Param('id') id: string, @Req() req: Request) {
-    const user = this.authService.getUserFromRequest(req);
+  @RequireRoles(Role.ROLE_PLATFORM_ACCOUNT_RW, Role.ROLE_PLATFORM_ADMIN)
+  async approve(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     await this.commandBus.execute(new ApproveUserCommand(id));
     const account = await this.queryBus.execute(
       new GetUserByIdQuery(id, user.id, user.roles),
@@ -127,8 +141,8 @@ export class CommandController {
 
   @Patch(':id/block')
   @HttpCode(HttpStatus.OK)
-  async block(@Param('id') id: string, @Req() req: Request) {
-    const user = this.authService.getUserFromRequest(req);
+  @RequireRoles(Role.ROLE_PLATFORM_ACCOUNT_RW, Role.ROLE_PLATFORM_ADMIN)
+  async block(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     await this.commandBus.execute(new BlockUserCommand(id));
     const account = await this.queryBus.execute(
       new GetUserByIdQuery(id, user.id, user.roles),
@@ -138,12 +152,12 @@ export class CommandController {
 
   @Patch(':id/role')
   @HttpCode(HttpStatus.OK)
+  @RequireRoles(Role.ROLE_PLATFORM_ACCOUNT_RW, Role.ROLE_PLATFORM_ADMIN)
   async grantRole(
     @Param('id') id: string,
     @Body('roles') roles: string[],
-    @Req() req: Request,
+    @CurrentUser() user: RequestUser,
   ) {
-    const user = this.authService.getUserFromRequest(req);
     await this.commandBus.execute(new GrantRoleCommand(id, roles));
     const account = await this.queryBus.execute(
       new GetUserByIdQuery(id, user.id, user.roles),

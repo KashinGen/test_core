@@ -18,7 +18,7 @@ src/
 │  ├─ repos/            # Repository implementations
 │  ├─ event-store/      # Event Store implementation
 │  ├─ read-model/       # Read model projections
-│  └─ adapters/         # Kafka, Redis adapters
+│  └─ adapters/         # Redis adapters
 └─ presentation/        # Presentation Layer
    ├─ command-controller/
    ├─ query-controller/
@@ -31,9 +31,9 @@ src/
 - **TypeScript** - язык программирования
 - **TypeORM** - для Event Store (write-side)
 - **Redis** - для Read Model (read-side + cache)
-- **Kafka** - Event Bus
 - **PostgreSQL** - Event Store storage
 - **@nestjs/cqrs** - CQRS модуль
+- **@nestjs/event-emitter** - внутренний Event Bus для проекций
 
 ## Установка
 
