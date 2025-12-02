@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { Logger } from 'nestjs-pino';
 import * as qs from 'qs';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -44,6 +45,48 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Настройка CORS
+  const configService = app.get(ConfigService);
+  const corsWhitelist = configService.get<string>('CORS_WHITELIST');
+  
+  if (!corsWhitelist || corsWhitelist.trim() === '') {
+    // Если CORS_WHITELIST не указан - блокируем все origins (безопасно по умолчанию)
+    const logger = app.get(Logger);
+    logger.warn(
+      'CORS_WHITELIST is not configured. CORS is disabled. ' +
+      'Set CORS_WHITELIST environment variable to enable CORS.',
+    );
+    // CORS не включается - все origins будут заблокированы
+  } else {
+    const allowedOrigins = corsWhitelist.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0);
+    
+    if (allowedOrigins.length === 0) {
+      const logger = app.get(Logger);
+      logger.warn('CORS_WHITELIST is empty. CORS is disabled.');
+    } else {
+      app.enableCors({
+        origin: (origin, callback) => {
+          // Разрешаем запросы без origin (например, Postman, curl, server-to-server)
+          if (!origin) {
+            return callback(null, true);
+          }
+          
+          if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error(`Origin ${origin} is not allowed by CORS`));
+          }
+        },
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'x-gateway-auth', 'integrationAuthToken'],
+      });
+      
+      const logger = app.get(Logger);
+      logger.log(`CORS enabled with whitelist: ${allowedOrigins.join(', ')}`);
+    }
+  }
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

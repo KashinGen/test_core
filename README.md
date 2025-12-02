@@ -103,19 +103,6 @@ curl -X POST http://localhost:3000/accounts \
 curl http://localhost:3000/accounts/{id}
 ```
 
-## Тестирование
-
-```bash
-# Unit тесты
-npm run test
-
-# E2E тесты
-npm run test:e2e
-
-# Coverage
-npm run test:cov
-```
-
 ## Docker
 
 ```bash
@@ -141,25 +128,37 @@ docker-compose up -d
 ## Безопасность
 
 - **Gateway Auth Guard**: Команды доступны только при наличии заголовка с gateway auth token
-- **JWT Verification**: JWT верификация включена по умолчанию (требует `JWT_PUBLIC_KEY`)
-  - Можно отключить через `DISABLE_JWT_VERIFICATION=true` (только для dev)
+- **JWT Verification**: JWT верификация всегда включена (требует `JWT_PUBLIC_KEY`)
 - **Role-based Authorization**: Проверка прав доступа на основе ролей пользователя
+- **CORS**: Настраивается через `CORS_WHITELIST` (если не указан, CORS отключен - безопасно по умолчанию)
 - Идемпотентность команд через `idempotencyKey`
 - Event Store только append (защита от подделки)
 
 ### Настройка JWT верификации
 
-В production обязательно укажите `JWT_PUBLIC_KEY`:
+Обязательно укажите `JWT_PUBLIC_KEY` для работы сервиса:
 
 ```env
-JWT_PUBLIC_KEY=<your_public_key>
+# Формат 1: Base64 (рекомендуется, совместимо с gateway)
+JWT_PUBLIC_KEY=b64:LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+
+# Формат 2: Прямой PEM формат
+JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
+-----END PUBLIC KEY-----
 ```
 
-Для development можно отключить верификацию (НЕ использовать в production!):
+Без этого ключа сервис не запустится. Формат `b64:` автоматически декодируется в PEM формат.
+
+### Настройка CORS
+
+Обязательно укажите `CORS_WHITELIST` для работы через браузер:
 
 ```env
-DISABLE_JWT_VERIFICATION=true
+CORS_WHITELIST=http://localhost:3000,https://example.com
 ```
+
+**Важно:** Если переменная не указана или пустая, CORS будет отключен (все origins заблокированы). Это безопасное поведение по умолчанию.
 
 ## Инициализация первого администратора
 

@@ -1,7 +1,8 @@
-import { CommandHandler, ICommandHandler, EventPublisher, Logger } from '@nestjs/cqrs';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { CommandHandler, ICommandHandler, EventPublisher, AggregateRoot, IEvent } from '@nestjs/cqrs';
+import { Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { UpdateAccountCommand } from './update-account.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
+import { User } from '@domain/entities/user.entity';
 import { AuthorizationService } from '@presentation/authorization';
 import { Role } from '@presentation/authorization/roles.enum';
 import { PRIVILEGED_ROLES } from '@presentation/authorization/constants/privileged-roles.constant';
@@ -58,60 +59,59 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
       throw new ForbiddenException('Insufficient permissions to update account');
     }
 
-      // Если пользователь обновляет себя, проверяем ограничения
-      if (isOwner && !hasAdminRole) {
-        // Владелец не может менять email и roles
-        if (command.email && command.email !== user.email) {
-          this.logger.warn(
-            `User ${requester.id} attempted to change their own email from ${user.email} to ${command.email}`,
-          );
-          throw new ForbiddenException('Cannot change your own email');
-        }
-
-        // Правильное сравнение массивов ролей (без учета порядка)
-        if (command.roles) {
-          const currentRoles = new Set(user.roles);
-          const newRoles = new Set(command.roles);
-          const rolesChanged =
-            currentRoles.size !== newRoles.size ||
-            ![...newRoles].every((role) => currentRoles.has(role));
-
-          if (rolesChanged) {
-            this.logger.warn(
-              `User ${requester.id} attempted to change their own roles from [${user.roles.join(', ')}] to [${command.roles.join(', ')}]`,
-            );
-            throw new ForbiddenException('Cannot change your own roles');
-          }
-        }
-      }
-
-      // Проверка на назначение привилегированных ролей (только ROLE_PLATFORM_ADMIN может назначать)
-      if (command.roles) {
-        const hasPrivilegedRole = command.roles.some((r) =>
-          PRIVILEGED_ROLES.includes(r as Role),
+    // Если пользователь обновляет себя, проверяем ограничения
+    if (isOwner && !hasAdminRole) {
+      // Владелец не может менять email и roles
+      if (command.email && command.email !== user.email) {
+        this.logger.warn(
+          `User ${requester.id} attempted to change their own email from ${user.email} to ${command.email}`,
         );
-
-        if (hasPrivilegedRole) {
-          if (!this.authService.hasAnyRole(requester, [Role.ROLE_PLATFORM_ADMIN])) {
-            this.logger.warn(
-              `User ${requester.id} (roles: ${requester.roles.join(', ')}) attempted to update account ${command.id} with privileged roles: ${command.roles.join(', ')}`,
-            );
-            throw new ForbiddenException(
-              'Only platform admin can assign privileged roles',
-            );
-          }
-          this.logger.log(
-            `User ${requester.id} updating account ${command.id} with privileged roles: ${command.roles.join(', ')}`,
-          );
-        }
+        throw new ForbiddenException('Cannot change your own email');
       }
 
-      this.logger.debug(
-        `User ${requester.id} updating account ${command.id} (owner: ${isOwner}, admin: ${hasAdminRole})`,
-      );
+      // Правильное сравнение массивов ролей (без учета порядка)
+      if (command.roles) {
+        const currentRoles = new Set(user.roles);
+        const newRoles = new Set(command.roles);
+        const rolesChanged =
+          currentRoles.size !== newRoles.size ||
+          ![...newRoles].every((role) => currentRoles.has(role));
+
+        if (rolesChanged) {
+          this.logger.warn(
+            `User ${requester.id} attempted to change their own roles from [${user.roles.join(', ')}] to [${command.roles.join(', ')}]`,
+          );
+          throw new ForbiddenException('Cannot change your own roles');
+        }
+      }
     }
 
-    const userWithEvents = this.publisher.mergeObjectContext(user);
+    // Проверка на назначение привилегированных ролей (только ROLE_PLATFORM_ADMIN может назначать)
+    if (command.roles) {
+      const hasPrivilegedRole = command.roles.some((r) =>
+        PRIVILEGED_ROLES.includes(r as Role),
+      );
+
+      if (hasPrivilegedRole) {
+        if (!this.authService.hasAnyRole(requester, [Role.ROLE_PLATFORM_ADMIN])) {
+          this.logger.warn(
+            `User ${requester.id} (roles: ${requester.roles.join(', ')}) attempted to update account ${command.id} with privileged roles: ${command.roles.join(', ')}`,
+          );
+          throw new ForbiddenException(
+            'Only platform admin can assign privileged roles',
+          );
+        }
+        this.logger.log(
+          `User ${requester.id} updating account ${command.id} with privileged roles: ${command.roles.join(', ')}`,
+        );
+      }
+    }
+
+    this.logger.debug(
+      `User ${requester.id} updating account ${command.id} (owner: ${isOwner}, admin: ${hasAdminRole})`,
+    );
+
+    const userWithEvents = this.publisher.mergeObjectContext(user) as unknown as User & AggregateRoot<IEvent>;
     
     // Если передан passwordHash, меняем пароль отдельной командой
     if (command.passwordHash) {

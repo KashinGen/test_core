@@ -1,5 +1,5 @@
-import { QueryHandler, IQueryHandler, Logger } from '@nestjs/cqrs';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { QueryHandler, IQueryHandler } from '@nestjs/cqrs';
+import { Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { GetUserByIdQuery } from './get-user-by-id.query';
 import { UserReadModelRepository } from '@infrastructure/read-model/user-read-model.repository';
 import { AccountDto } from '@presentation/dto/account.dto';

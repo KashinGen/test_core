@@ -30,12 +30,17 @@ NODE_ENV=development
 GATEWAY_AUTH_TOKEN=super-secret-token
 
 # JWT Configuration
-# JWT_PUBLIC_KEY - публичный ключ для верификации JWT (обязательно в production)
-# Формат: b64:<base64_encoded_key> или прямой ключ
+# JWT_PUBLIC_KEY - публичный ключ для верификации JWT (обязательно!)
+# Формат: b64:<base64_encoded_key> или прямой PEM формат
+# Пример: JWT_PUBLIC_KEY=b64:LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+# Или: JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----
 JWT_PUBLIC_KEY=
 
-# Для development можно отключить верификацию JWT (НЕ использовать в production!)
-# DISABLE_JWT_VERIFICATION=true
+# CORS Configuration
+# CORS_WHITELIST - список разрешенных origins через запятую (обязательно!)
+# Если не указан, CORS будет отключен (все origins заблокированы)
+# Пример: CORS_WHITELIST=http://localhost:3000,https://example.com
+CORS_WHITELIST=http://localhost:3000
 ```
 
 ## 3. Запуск инфраструктуры через Docker
@@ -81,19 +86,6 @@ curl -X POST http://localhost:3000/accounts \
 
 ```bash
 curl http://localhost:3000/accounts/{id}
-```
-
-## 6. Тестирование
-
-```bash
-# Unit тесты
-npm run test
-
-# E2E тесты
-npm run test:e2e
-
-# Coverage
-npm run test:cov
 ```
 
 ## Структура проекта

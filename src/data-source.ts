@@ -9,7 +9,12 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'core_db',
   entities: [EventEntity],
-  migrations: [__dirname + '/migrations/**/*.ts'],
+  // В production используем скомпилированные JS файлы, в dev - TS
+  migrations: [
+    process.env.NODE_ENV === 'production'
+      ? __dirname + '/migrations/**/*.js'
+      : __dirname + '/migrations/**/*.ts',
+  ],
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
 });

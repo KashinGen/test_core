@@ -1,8 +1,9 @@
-import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
+import { CommandHandler, ICommandHandler, EventPublisher, AggregateRoot, IEvent } from '@nestjs/cqrs';
 import { NotFoundException } from '@nestjs/common';
 import { ApproveUserCommand } from './approve-user.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
 import { UserDomainService } from '@domain/services/user-domain.service';
+import { User } from '@domain/entities/user.entity';
 
 @CommandHandler(ApproveUserCommand)
 export class ApproveUserHandler implements ICommandHandler<ApproveUserCommand> {
@@ -22,7 +23,7 @@ export class ApproveUserHandler implements ICommandHandler<ApproveUserCommand> {
       throw new Error('User cannot be approved');
     }
 
-    const userWithEvents = this.publisher.mergeObjectContext(user);
+    const userWithEvents = this.publisher.mergeObjectContext(user) as unknown as User & AggregateRoot<IEvent>;
     userWithEvents.approve();
     await this.repo.save(userWithEvents);
     userWithEvents.commit();

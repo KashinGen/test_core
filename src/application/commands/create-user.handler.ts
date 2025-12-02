@@ -1,5 +1,5 @@
-import { CommandHandler, ICommandHandler, EventPublisher, Logger } from '@nestjs/cqrs';
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { CommandHandler, ICommandHandler, EventPublisher, AggregateRoot, IEvent } from '@nestjs/cqrs';
+import { Logger, ConflictException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
 import { CreateAccountCommand, CreateUserCommand } from './create-user.command';
@@ -77,7 +77,7 @@ export class CreateAccountHandler implements ICommandHandler<CreateAccountComman
       command.roles,
       command.sources,
     );
-    const userWithEvents = this.publisher.mergeObjectContext(user);
+    const userWithEvents = this.publisher.mergeObjectContext(user) as unknown as User & AggregateRoot<IEvent>;
 
     await this.repo.save(userWithEvents);
     userWithEvents.commit();

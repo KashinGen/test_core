@@ -1,7 +1,8 @@
-import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
+import { CommandHandler, ICommandHandler, EventPublisher, AggregateRoot, IEvent } from '@nestjs/cqrs';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ChangeAccountPasswordCommand } from './change-account-password.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
+import { User } from '@domain/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 
 @CommandHandler(ChangeAccountPasswordCommand)
@@ -39,7 +40,7 @@ export class ChangeAccountPasswordHandler
 
     const hash = await bcrypt.hash(command.password, 12);
 
-    const userWithEvents = this.publisher.mergeObjectContext(user);
+    const userWithEvents = this.publisher.mergeObjectContext(user) as unknown as User & AggregateRoot<IEvent>;
     userWithEvents.changePassword(hash);
     await this.repo.save(userWithEvents);
     userWithEvents.commit();

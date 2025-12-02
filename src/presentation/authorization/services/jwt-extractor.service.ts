@@ -5,37 +5,68 @@ import * as jwt from 'jsonwebtoken';
 import { RequestUser } from '../interfaces/request-user.interface';
 import { Role } from '../roles.enum';
 
+/**
+ * Парсит JWT ключ из формата b64:<base64_encoded_key> или возвращает ключ как есть
+ */
+function parseJwtKey(key: string): string {
+  if (!key) {
+    throw new Error('JWT key is empty');
+  }
+
+  const trimmedKey = key.trim();
+
+  // Если ключ начинается с b64:, декодируем base64
+  if (trimmedKey.startsWith('b64:')) {
+    const base64Part = trimmedKey.substring(4); // Убираем префикс "b64:"
+    
+    if (!base64Part) {
+      throw new Error('JWT key has "b64:" prefix but no base64 content after it');
+    }
+
+    try {
+      const decoded = Buffer.from(base64Part, 'base64').toString('utf8');
+      
+      // Проверяем, что это похоже на PEM формат
+      if (!decoded.includes('BEGIN') || !decoded.includes('END')) {
+        throw new Error('Decoded JWT key does not appear to be in PEM format (missing BEGIN/END markers)');
+      }
+
+      return decoded;
+    } catch (error) {
+      throw new Error(`Failed to parse JWT key from base64: ${error.message}`);
+    }
+  }
+
+  // Если не b64:, возвращаем ключ как есть (может быть прямой PEM формат)
+  return trimmedKey;
+}
+
 @Injectable()
 export class JwtExtractorService {
   private readonly logger = new Logger(JwtExtractorService.name);
-  private readonly verifyJwt: boolean;
-  private readonly jwtPublicKey?: string;
+  private readonly jwtPublicKey: string;
 
   constructor(private readonly configService: ConfigService) {
-    // JWT верификация включена по умолчанию для безопасности
-    // Можно отключить через DISABLE_JWT_VERIFICATION=true (только для dev)
-    const disableVerification = this.configService.get<string>('DISABLE_JWT_VERIFICATION') === 'true';
-    this.verifyJwt = !disableVerification;
-    this.jwtPublicKey = this.configService.get<string>('JWT_PUBLIC_KEY');
+    // JWT верификация всегда включена для безопасности
+    const rawKey = this.configService.get<string>('JWT_PUBLIC_KEY') || '';
 
-    // Если верификация включена, но ключ не указан - это ошибка конфигурации
-    if (this.verifyJwt && !this.jwtPublicKey) {
-      this.logger.error(
-        'JWT verification is enabled but JWT_PUBLIC_KEY is not configured. ' +
-        'Either set JWT_PUBLIC_KEY or set DISABLE_JWT_VERIFICATION=true for development.',
-      );
+    // JWT_PUBLIC_KEY обязателен для работы сервиса
+    if (!rawKey) {
+      this.logger.error('JWT_PUBLIC_KEY is required but not configured.');
       throw new Error(
-        'JWT_PUBLIC_KEY is required when JWT verification is enabled. ' +
-        'Set JWT_PUBLIC_KEY environment variable or disable verification with DISABLE_JWT_VERIFICATION=true',
+        'JWT_PUBLIC_KEY is required. Set JWT_PUBLIC_KEY environment variable.',
       );
     }
 
-    if (this.verifyJwt) {
+    try {
+      // Парсим ключ (поддерживает формат b64: и прямой PEM)
+      this.jwtPublicKey = parseJwtKey(rawKey);
       this.logger.log('JWT verification is ENABLED. All JWT tokens will be verified.');
-    } else {
-      this.logger.warn(
-        'JWT verification is DISABLED. Tokens will be decoded without verification. ' +
-        'This should only be used in development environments.',
+    } catch (error) {
+      this.logger.error(`Failed to parse JWT_PUBLIC_KEY: ${error.message}`);
+      throw new Error(
+        `Invalid JWT_PUBLIC_KEY format: ${error.message}. ` +
+        'Expected format: "b64:<base64_encoded_key>" or direct PEM format.',
       );
     }
   }
@@ -48,25 +79,14 @@ export class JwtExtractorService {
 
     const token = authHeader.substring(7);
     try {
+      // Всегда верифицируем JWT токен
       let decoded: any;
-
-      if (this.verifyJwt) {
-        // Верификация JWT (включена по умолчанию)
-        if (!this.jwtPublicKey) {
-          this.logger.error('JWT verification is enabled but JWT_PUBLIC_KEY is not configured');
-          return null;
-        }
-        try {
-          decoded = jwt.verify(token, this.jwtPublicKey, { algorithms: ['RS256', 'HS256'] });
-          this.logger.debug('JWT token verified successfully');
-        } catch (verifyError: any) {
-          this.logger.warn(`JWT verification failed: ${verifyError.message}`);
-          return null;
-        }
-      } else {
-        // Decode without verification (только для dev, если DISABLE_JWT_VERIFICATION=true)
-        this.logger.debug('JWT verification disabled, decoding without verification');
-        decoded = jwt.decode(token, { json: true }) as any;
+      try {
+        decoded = jwt.verify(token, this.jwtPublicKey, { algorithms: ['RS256', 'HS256'] });
+        this.logger.debug('JWT token verified successfully');
+      } catch (verifyError: any) {
+        this.logger.warn(`JWT verification failed: ${verifyError.message}`);
+        return null;
       }
       if (!decoded) {
         this.logger.debug('Failed to decode JWT token');

@@ -1,7 +1,8 @@
-import { CommandHandler, ICommandHandler, EventPublisher, Logger } from '@nestjs/cqrs';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { CommandHandler, ICommandHandler, EventPublisher, AggregateRoot, IEvent } from '@nestjs/cqrs';
+import { Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DeleteAccountCommand } from './delete-account.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
+import { User } from '@domain/entities/user.entity';
 import { AuthorizationService } from '@presentation/authorization';
 import { Role } from '@presentation/authorization/roles.enum';
 
@@ -64,7 +65,7 @@ export class DeleteAccountHandler implements ICommandHandler<DeleteAccountComman
 
     this.logger.log(`User ${requester.id} deleting account ${command.id}`);
 
-    const userWithEvents = this.publisher.mergeObjectContext(user);
+    const userWithEvents = this.publisher.mergeObjectContext(user) as unknown as User & AggregateRoot<IEvent>;
     userWithEvents.delete();
     await this.repo.save(userWithEvents);
     userWithEvents.commit();
