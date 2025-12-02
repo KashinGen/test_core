@@ -490,3 +490,4 @@ if (JSON.stringify(command.roles) !== JSON.stringify(user.roles)) {
 2. Добавить тесты
 3. Провести security audit перед production
 
+

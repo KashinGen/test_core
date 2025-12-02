@@ -12,9 +12,32 @@ export class JwtExtractorService {
   private readonly jwtPublicKey?: string;
 
   constructor(private readonly configService: ConfigService) {
-    // Опциональная верификация JWT (по умолчанию отключена, так как gateway уже проверил)
-    this.verifyJwt = this.configService.get<string>('VERIFY_JWT_IN_CORE') === 'true';
+    // JWT верификация включена по умолчанию для безопасности
+    // Можно отключить через DISABLE_JWT_VERIFICATION=true (только для dev)
+    const disableVerification = this.configService.get<string>('DISABLE_JWT_VERIFICATION') === 'true';
+    this.verifyJwt = !disableVerification;
     this.jwtPublicKey = this.configService.get<string>('JWT_PUBLIC_KEY');
+
+    // Если верификация включена, но ключ не указан - это ошибка конфигурации
+    if (this.verifyJwt && !this.jwtPublicKey) {
+      this.logger.error(
+        'JWT verification is enabled but JWT_PUBLIC_KEY is not configured. ' +
+        'Either set JWT_PUBLIC_KEY or set DISABLE_JWT_VERIFICATION=true for development.',
+      );
+      throw new Error(
+        'JWT_PUBLIC_KEY is required when JWT verification is enabled. ' +
+        'Set JWT_PUBLIC_KEY environment variable or disable verification with DISABLE_JWT_VERIFICATION=true',
+      );
+    }
+
+    if (this.verifyJwt) {
+      this.logger.log('JWT verification is ENABLED. All JWT tokens will be verified.');
+    } else {
+      this.logger.warn(
+        'JWT verification is DISABLED. Tokens will be decoded without verification. ' +
+        'This should only be used in development environments.',
+      );
+    }
   }
 
   extractUserFromRequest(request: Request): RequestUser | null {
@@ -27,16 +50,22 @@ export class JwtExtractorService {
     try {
       let decoded: any;
 
-      if (this.verifyJwt && this.jwtPublicKey) {
-        // Верификация JWT (если включена)
+      if (this.verifyJwt) {
+        // Верификация JWT (включена по умолчанию)
+        if (!this.jwtPublicKey) {
+          this.logger.error('JWT verification is enabled but JWT_PUBLIC_KEY is not configured');
+          return null;
+        }
         try {
           decoded = jwt.verify(token, this.jwtPublicKey, { algorithms: ['RS256', 'HS256'] });
+          this.logger.debug('JWT token verified successfully');
         } catch (verifyError: any) {
           this.logger.warn(`JWT verification failed: ${verifyError.message}`);
           return null;
         }
       } else {
-        // Decode without verification (gateway already verified it)
+        // Decode without verification (только для dev, если DISABLE_JWT_VERIFICATION=true)
+        this.logger.debug('JWT verification disabled, decoding without verification');
         decoded = jwt.decode(token, { json: true }) as any;
       }
       if (!decoded) {

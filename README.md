@@ -140,9 +140,26 @@ docker-compose up -d
 
 ## Безопасность
 
-- Команды доступны только при наличии заголовка `X-Gateway-Auth` с секретом, который знает gateway
+- **Gateway Auth Guard**: Команды доступны только при наличии заголовка с gateway auth token
+- **JWT Verification**: JWT верификация включена по умолчанию (требует `JWT_PUBLIC_KEY`)
+  - Можно отключить через `DISABLE_JWT_VERIFICATION=true` (только для dev)
+- **Role-based Authorization**: Проверка прав доступа на основе ролей пользователя
 - Идемпотентность команд через `idempotencyKey`
 - Event Store только append (защита от подделки)
+
+### Настройка JWT верификации
+
+В production обязательно укажите `JWT_PUBLIC_KEY`:
+
+```env
+JWT_PUBLIC_KEY=<your_public_key>
+```
+
+Для development можно отключить верификацию (НЕ использовать в production!):
+
+```env
+DISABLE_JWT_VERIFICATION=true
+```
 
 ## Инициализация первого администратора
 

@@ -28,6 +28,14 @@ REDIS_DB=0
 PORT=3000
 NODE_ENV=development
 GATEWAY_AUTH_TOKEN=super-secret-token
+
+# JWT Configuration
+# JWT_PUBLIC_KEY - публичный ключ для верификации JWT (обязательно в production)
+# Формат: b64:<base64_encoded_key> или прямой ключ
+JWT_PUBLIC_KEY=
+
+# Для development можно отключить верификацию JWT (НЕ использовать в production!)
+# DISABLE_JWT_VERIFICATION=true
 ```
 
 ## 3. Запуск инфраструктуры через Docker
