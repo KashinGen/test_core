@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventEntity } from './event.entity';
 import { IEvent, AggregateRoot } from '@nestjs/cqrs';
+import { User } from '@domain/entities/user.entity';
 
 @Injectable()
 export class EventStoreService {
@@ -19,7 +20,7 @@ export class EventStoreService {
       return;
     }
 
-    const aggregateId = aggregate.id;
+    const aggregateId = (aggregate as User).id;
     const currentVersion = await this.getCurrentVersion(aggregateId);
 
     const eventEntities = events.map((event, index) => {
@@ -32,7 +33,7 @@ export class EventStoreService {
     });
 
     await this.eventRepository.save(eventEntities);
-    aggregate.markEventsAsCommitted();
+    aggregate.commit();
 
     // Публикуем события для проекторов
     for (const event of events) {
@@ -77,4 +78,3 @@ export class EventStoreService {
     return eventEntity.payload as IEvent;
   }
 }
-

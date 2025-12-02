@@ -33,13 +33,21 @@ export class User extends AggregateRoot<IEvent> {
     return user;
   }
 
-  update(name?: string, email?: string, roles?: string[], sources?: string[]): void {
+  update(
+    name?: string,
+    email?: string,
+    roles?: string[],
+    sources?: string[],
+  ): void {
     if (this._deletedAt) {
       throw new Error('Cannot update deleted user');
     }
     this.apply(new UserUpdatedEvent(this._id, name, email, roles, sources));
   }
 
+  public markEventsAsCommitted(): void {
+    super.commit();
+  }
   delete(): void {
     if (this._deletedAt) {
       return; // Already deleted
