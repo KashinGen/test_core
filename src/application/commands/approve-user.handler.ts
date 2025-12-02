@@ -24,8 +24,8 @@ export class ApproveUserHandler implements ICommandHandler<ApproveUserCommand> {
     }
 
     const userWithEvents = this.publisher.mergeObjectContext(user);
-    (userWithEvents as any).approve();
-    await this.repo.save(userWithEvents as any);
+    userWithEvents.approve();
+    await this.repo.save(userWithEvents);
     userWithEvents.commit();
 
     return { ok: true };

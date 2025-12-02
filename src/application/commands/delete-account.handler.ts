@@ -66,8 +66,8 @@ export class DeleteAccountHandler implements ICommandHandler<DeleteAccountComman
     this.logger.log(`User ${requester.id} deleting account ${command.id}`);
 
     const userWithEvents = this.publisher.mergeObjectContext(user);
-    (userWithEvents as any).delete();
-    await this.repo.save(userWithEvents as any);
+    userWithEvents.delete();
+    await this.repo.save(userWithEvents);
     userWithEvents.commit();
 
     return { ok: true };

@@ -79,10 +79,10 @@ export class CreateAccountHandler implements ICommandHandler<CreateAccountComman
     );
     const userWithEvents = this.publisher.mergeObjectContext(user);
 
-    await this.repo.save(userWithEvents as any);
+    await this.repo.save(userWithEvents);
     userWithEvents.commit();
 
-    return { id: (userWithEvents as any).id };
+    return { id: userWithEvents.id };
   }
 }
 

@@ -24,8 +24,8 @@ export class BlockUserHandler implements ICommandHandler<BlockUserCommand> {
     }
 
     const userWithEvents = this.publisher.mergeObjectContext(user);
-    (userWithEvents as any).block();
-    await this.repo.save(userWithEvents as any);
+    userWithEvents.block();
+    await this.repo.save(userWithEvents);
     userWithEvents.commit();
 
     return { ok: true };

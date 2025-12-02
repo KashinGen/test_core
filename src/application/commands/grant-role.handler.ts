@@ -24,8 +24,8 @@ export class GrantRoleHandler implements ICommandHandler<GrantRoleCommand> {
     }
 
     const userWithEvents = this.publisher.mergeObjectContext(user);
-    (userWithEvents as any).grantRoles(command.roles);
-    await this.repo.save(userWithEvents as any);
+    userWithEvents.grantRoles(command.roles);
+    await this.repo.save(userWithEvents);
     userWithEvents.commit();
 
     return { ok: true };

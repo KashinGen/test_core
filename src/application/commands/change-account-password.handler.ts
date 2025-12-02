@@ -41,8 +41,8 @@ export class ChangeAccountPasswordHandler
     const hash = await bcrypt.hash(command.password, 12);
 
     const userWithEvents = this.publisher.mergeObjectContext(user);
-    (userWithEvents as any).changePassword(hash);
-    await this.repo.save(userWithEvents as any);
+    userWithEvents.changePassword(hash);
+    await this.repo.save(userWithEvents);
     userWithEvents.commit();
 
     // TODO: Удалить использованный токен

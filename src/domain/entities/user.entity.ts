@@ -1,4 +1,4 @@
-import { AggregateRoot } from '../common/aggregate-root';
+import { AggregateRoot, IEvent } from '@nestjs/cqrs';
 import { UserCreatedEvent } from '../events/user-created.event';
 import { UserUpdatedEvent } from '../events/user-updated.event';
 import { UserDeletedEvent } from '../events/user-deleted.event';
@@ -6,9 +6,8 @@ import { UserApprovedEvent } from '../events/user-approved.event';
 import { UserBlockedEvent } from '../events/user-blocked.event';
 import { RoleGrantedEvent } from '../events/role-granted.event';
 import { PasswordChangedEvent } from '../events/password-changed.event';
-import { IEvent } from '@nestjs/cqrs';
 
-export class User extends AggregateRoot {
+export class User extends AggregateRoot<IEvent> {
   private _id: string;
   private _name: string;
   private _email: string;

@@ -115,19 +115,19 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
     
     // Если передан passwordHash, меняем пароль отдельной командой
     if (command.passwordHash) {
-      (userWithEvents as any).changePassword(command.passwordHash);
+      userWithEvents.changePassword(command.passwordHash);
     }
     
-    (userWithEvents as any).update(
+    userWithEvents.update(
       command.name,
       command.email,
       command.roles,
       command.sources,
     );
-    await this.repo.save(userWithEvents as any);
+    await this.repo.save(userWithEvents);
     userWithEvents.commit();
 
-    return { id: (userWithEvents as any).id };
+    return { id: userWithEvents.id };
   }
 }
 

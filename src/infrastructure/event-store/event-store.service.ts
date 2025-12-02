@@ -3,8 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventEntity } from './event.entity';
-import { IEvent } from '@nestjs/cqrs';
-import { AggregateRoot } from '@domain/common/aggregate-root';
+import { IEvent, AggregateRoot } from '@nestjs/cqrs';
 
 @Injectable()
 export class EventStoreService {
@@ -14,7 +13,7 @@ export class EventStoreService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async save(aggregate: AggregateRoot): Promise<void> {
+  async save(aggregate: AggregateRoot<IEvent>): Promise<void> {
     const events = aggregate.getUncommittedEvents();
     if (events.length === 0) {
       return;
