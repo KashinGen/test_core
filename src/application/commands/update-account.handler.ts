@@ -1,4 +1,4 @@
-import { CommandHandler, ICommandHandler, EventPublisher, AggregateRoot, IEvent } from '@nestjs/cqrs';
+import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
 import { Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { UpdateAccountCommand } from './update-account.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
@@ -111,23 +111,23 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
       `User ${requester.id} updating account ${command.id} (owner: ${isOwner}, admin: ${hasAdminRole})`,
     );
 
-    const userWithEvents = this.publisher.mergeObjectContext(user) as unknown as User & AggregateRoot<IEvent>;
+    const userWithEvents = this.publisher.mergeObjectContext(user);
     
     // Если передан passwordHash, меняем пароль отдельной командой
     if (command.passwordHash) {
-      userWithEvents.changePassword(command.passwordHash);
+      (userWithEvents as any).changePassword(command.passwordHash);
     }
     
-    userWithEvents.update(
+    (userWithEvents as any).update(
       command.name,
       command.email,
       command.roles,
       command.sources,
     );
-    await this.repo.save(userWithEvents);
+    await this.repo.save(userWithEvents as any);
     userWithEvents.commit();
 
-    return { id: userWithEvents.id };
+    return { id: (userWithEvents as any).id };
   }
 }
 

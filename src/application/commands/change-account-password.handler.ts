@@ -1,4 +1,4 @@
-import { CommandHandler, ICommandHandler, EventPublisher, AggregateRoot, IEvent } from '@nestjs/cqrs';
+import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ChangeAccountPasswordCommand } from './change-account-password.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
@@ -40,9 +40,9 @@ export class ChangeAccountPasswordHandler
 
     const hash = await bcrypt.hash(command.password, 12);
 
-    const userWithEvents = this.publisher.mergeObjectContext(user) as unknown as User & AggregateRoot<IEvent>;
-    userWithEvents.changePassword(hash);
-    await this.repo.save(userWithEvents);
+    const userWithEvents = this.publisher.mergeObjectContext(user);
+    (userWithEvents as any).changePassword(hash);
+    await this.repo.save(userWithEvents as any);
     userWithEvents.commit();
 
     // TODO: Удалить использованный токен

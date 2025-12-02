@@ -1,4 +1,4 @@
-import { CommandHandler, ICommandHandler, EventPublisher, AggregateRoot, IEvent } from '@nestjs/cqrs';
+import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
 import { NotFoundException } from '@nestjs/common';
 import { GrantRoleCommand } from './grant-role.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
@@ -23,9 +23,9 @@ export class GrantRoleHandler implements ICommandHandler<GrantRoleCommand> {
       throw new Error('Roles cannot be granted');
     }
 
-    const userWithEvents = this.publisher.mergeObjectContext(user) as unknown as User & AggregateRoot<IEvent>;
-    userWithEvents.grantRoles(command.roles);
-    await this.repo.save(userWithEvents);
+    const userWithEvents = this.publisher.mergeObjectContext(user);
+    (userWithEvents as any).grantRoles(command.roles);
+    await this.repo.save(userWithEvents as any);
     userWithEvents.commit();
 
     return { ok: true };
