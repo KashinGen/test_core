@@ -1,7 +1,8 @@
 import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { ChangeAccountPasswordCommand } from './change-account-password.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
+import { PasswordResetRepository } from '@infrastructure/repos/password-reset.repository';
 import { User } from '@domain/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 
@@ -9,31 +10,32 @@ import * as bcrypt from 'bcrypt';
 export class ChangeAccountPasswordHandler
   implements ICommandHandler<ChangeAccountPasswordCommand>
 {
+  private readonly TOKEN_LIFETIME_HOURS = 1;
+
   constructor(
+    @Inject('IUserRepository')
     private readonly repo: IUserRepository,
+    private readonly passwordResetRepo: PasswordResetRepository,
     private readonly publisher: EventPublisher,
   ) {}
 
   async execute(
     command: ChangeAccountPasswordCommand,
-  ): Promise<{ ok: boolean }> {
-    // TODO: Получить userId из токена (из Redis или БД)
-    // const userId = await this.tokenStore.getUserId(command.token);
-    // if (!userId) {
-    //   throw new BadRequestException('Invalid or expired token');
-    // }
+  ): Promise<void> {
+    const passwordReset = await this.passwordResetRepo.findActiveByToken(
+      command.token,
+      this.TOKEN_LIFETIME_HOURS,
+    );
 
-    // Временная реализация - нужно добавить токен-стор
-    // Для примера используем токен как ID (небезопасно, только для демо)
-    let userId: string | undefined;
-    try {
-      // В реальном проекте токен должен быть в формате UUID и храниться в Redis
-      userId = command.token; // ВРЕМЕННО - только для демо
-    } catch {
-      throw new BadRequestException('Invalid token format');
+    if (!passwordReset) {
+      throw new BadRequestException('Invalid or expired password reset token');
     }
 
-    const user = await this.repo.findById(userId);
+    if (passwordReset.usedAt) {
+      throw new BadRequestException('Password reset token has already been used');
+    }
+
+    const user = await this.repo.findById(passwordReset.accountId);
     if (!user || user.isDeleted) {
       throw new NotFoundException('Account not found');
     }
@@ -45,10 +47,8 @@ export class ChangeAccountPasswordHandler
     await this.repo.save(userWithEvents);
     userWithEvents.commit();
 
-    // TODO: Удалить использованный токен
-    // await this.tokenStore.delete(command.token);
-
-    return { ok: true };
+    await this.passwordResetRepo.markAsUsed(command.token);
   }
 }
+
 

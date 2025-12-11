@@ -26,7 +26,6 @@ function parseJwtKey(key: string): string {
     try {
       const decoded = Buffer.from(base64Part, 'base64').toString('utf8');
       
-      // Проверяем, что это похоже на PEM формат
       if (!decoded.includes('BEGIN') || !decoded.includes('END')) {
         throw new Error('Decoded JWT key does not appear to be in PEM format (missing BEGIN/END markers)');
       }

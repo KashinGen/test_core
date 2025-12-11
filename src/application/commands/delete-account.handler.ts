@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
-import { Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Logger, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { DeleteAccountCommand } from './delete-account.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
 import { User } from '@domain/entities/user.entity';
@@ -11,6 +11,7 @@ export class DeleteAccountHandler implements ICommandHandler<DeleteAccountComman
   private readonly logger = new Logger(DeleteAccountHandler.name);
 
   constructor(
+    @Inject('IUserRepository')
     private readonly repo: IUserRepository,
     private readonly publisher: EventPublisher,
     private readonly authService: AuthorizationService,
@@ -23,13 +24,9 @@ export class DeleteAccountHandler implements ICommandHandler<DeleteAccountComman
     }
 
     if (user.isDeleted) {
-      return { ok: true }; // Already deleted
+      return { ok: true };
     }
 
-    // Базовая проверка ролей выполняется на уровне контроллера через RolesGuard
-    // Здесь проверяем только бизнес-логику: запрет на удаление себя
-    
-    // RequesterId обязателен для проверки прав
     if (!command.requesterId || !command.requesterRoles || command.requesterRoles.length === 0) {
       this.logger.error(
         `DeleteAccountCommand executed without requesterId/requesterRoles for account ${command.id}`,
@@ -50,7 +47,6 @@ export class DeleteAccountHandler implements ICommandHandler<DeleteAccountComman
       throw new ForbiddenException('Cannot delete your own account');
     }
 
-    // Defense-in-depth: дополнительная проверка (guard уже проверил, но на всякий случай)
     if (
       !this.authService.hasAnyRole(requester, [
         Role.ROLE_PLATFORM_ACCOUNT_RW,
@@ -73,4 +69,5 @@ export class DeleteAccountHandler implements ICommandHandler<DeleteAccountComman
     return { ok: true };
   }
 }
+
 

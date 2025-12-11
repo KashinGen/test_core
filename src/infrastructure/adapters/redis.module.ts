@@ -7,8 +7,13 @@ import { Redis } from 'ioredis';
     {
       provide: 'REDIS_CLIENT',
       useFactory: () => {
+        let redisHost = process.env.REDIS_HOST || 'localhost';
+        if (redisHost.startsWith('redis://')) {
+          redisHost = redisHost.substring(7);
+        }
+        
         return new Redis({
-          host: process.env.REDIS_HOST || 'localhost',
+          host: redisHost,
           port: parseInt(process.env.REDIS_PORT || '6379', 10),
           password: process.env.REDIS_PASSWORD,
           db: parseInt(process.env.REDIS_DB || '0', 10),
@@ -19,5 +24,6 @@ import { Redis } from 'ioredis';
   exports: ['REDIS_CLIENT'],
 })
 export class RedisModule {}
+
 
 

@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
-import { Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Logger, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { UpdateAccountCommand } from './update-account.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
 import { User } from '@domain/entities/user.entity';
@@ -12,6 +12,7 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
   private readonly logger = new Logger(UpdateAccountHandler.name);
 
   constructor(
+    @Inject('IUserRepository')
     private readonly repo: IUserRepository,
     private readonly publisher: EventPublisher,
     private readonly authService: AuthorizationService,
@@ -27,10 +28,6 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
       throw new NotFoundException('Account is deleted');
     }
 
-    // Базовая проверка ролей выполняется на уровне контроллера через SelfOrRolesGuard
-    // Здесь проверяем только бизнес-логику: ограничения для self-update и привилегированные роли
-    
-    // RequesterId обязателен для проверки прав
     if (!command.requesterId || !command.requesterRoles || command.requesterRoles.length === 0) {
       this.logger.error(
         `UpdateAccountCommand executed without requesterId/requesterRoles for account ${command.id}`,
@@ -51,7 +48,6 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
       Role.ROLE_PLATFORM_ADMIN,
     ]);
 
-    // Defense-in-depth: дополнительная проверка (guard уже проверил, но на всякий случай)
     if (!isOwner && !hasAdminRole) {
       this.logger.warn(
         `User ${requester.id} (roles: ${requester.roles.join(', ')}) attempted to update account ${command.id} without sufficient permissions`,
@@ -59,9 +55,7 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
       throw new ForbiddenException('Insufficient permissions to update account');
     }
 
-    // Если пользователь обновляет себя, проверяем ограничения
     if (isOwner && !hasAdminRole) {
-      // Владелец не может менять email и roles
       if (command.email && command.email !== user.email) {
         this.logger.warn(
           `User ${requester.id} attempted to change their own email from ${user.email} to ${command.email}`,
@@ -69,7 +63,6 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
         throw new ForbiddenException('Cannot change your own email');
       }
 
-      // Правильное сравнение массивов ролей (без учета порядка)
       if (command.roles) {
         const currentRoles = new Set(user.roles);
         const newRoles = new Set(command.roles);
@@ -86,7 +79,6 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
       }
     }
 
-    // Проверка на назначение привилегированных ролей (только ROLE_PLATFORM_ADMIN может назначать)
     if (command.roles) {
       const hasPrivilegedRole = command.roles.some((r) =>
         PRIVILEGED_ROLES.includes(r as Role),
@@ -113,7 +105,6 @@ export class UpdateAccountHandler implements ICommandHandler<UpdateAccountComman
 
     const userWithEvents = this.publisher.mergeObjectContext(user);
     
-    // Если передан passwordHash, меняем пароль отдельной командой
     if (command.passwordHash) {
       userWithEvents.changePassword(command.passwordHash);
     }

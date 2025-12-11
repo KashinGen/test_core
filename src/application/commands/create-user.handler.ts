@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
-import { Logger, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Logger, ConflictException, ForbiddenException, Inject } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
 import { CreateAccountCommand, CreateUserCommand } from './create-user.command';
@@ -14,16 +14,13 @@ export class CreateAccountHandler implements ICommandHandler<CreateAccountComman
   private readonly logger = new Logger(CreateAccountHandler.name);
 
   constructor(
+    @Inject('IUserRepository')
     private readonly repo: IUserRepository,
     private readonly publisher: EventPublisher,
     private readonly authService: AuthorizationService,
   ) {}
 
   async execute(command: CreateAccountCommand): Promise<{ id: string }> {
-    // Базовая проверка ролей выполняется на уровне контроллера через RolesGuard
-    // Здесь проверяем только бизнес-логику: назначение привилегированных ролей
-    
-    // RequesterId обязателен для проверки прав
     if (!command.requesterId || !command.requesterRoles || command.requesterRoles.length === 0) {
       this.logger.error(
         `CreateAccountCommand executed without requesterId/requesterRoles for email ${command.email}`,
@@ -38,7 +35,6 @@ export class CreateAccountHandler implements ICommandHandler<CreateAccountComman
       ),
     };
 
-    // Проверка на назначение привилегированных ролей (только ROLE_PLATFORM_ADMIN может назначать)
     const hasPrivilegedRole = command.roles.some((r) =>
       PRIVILEGED_ROLES.includes(r as Role),
     );
@@ -86,7 +82,6 @@ export class CreateAccountHandler implements ICommandHandler<CreateAccountComman
   }
 }
 
-// Обратная совместимость
 @CommandHandler(CreateUserCommand)
 export class CreateUserHandler extends CreateAccountHandler
   implements ICommandHandler<CreateUserCommand>

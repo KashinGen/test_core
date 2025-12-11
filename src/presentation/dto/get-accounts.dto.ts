@@ -42,14 +42,12 @@ export class GetAccountsDto {
   @IsArray()
   @IsString({ each: true })
   @Transform(({ value, obj }) => {
-    // Поддержка форматов: ?id[]=uuid1&id[]=uuid2 или ?id=uuid1&id=uuid2
     if (Array.isArray(value)) {
       return value.filter((v) => v !== null && v !== undefined);
     }
     if (typeof value === 'string') {
       return [value];
     }
-    // Если пришел как объект из qs.parse
     if (obj.id && typeof obj.id === 'object' && !Array.isArray(obj.id)) {
       return Object.values(obj.id).filter((v) => typeof v === 'string');
     }
@@ -97,12 +95,10 @@ export class GetAccountsDto {
 
   @IsOptional()
   @Transform(({ value, obj }) => {
-    // Парсинг order[name], order[email] из query параметров
     if (value && typeof value === 'object') {
       return value;
     }
     
-    // Если order пришел как вложенный объект из qs.parse
     const order: any = {};
     if (obj.order) {
       if (typeof obj.order === 'object') {
@@ -110,7 +106,6 @@ export class GetAccountsDto {
       }
     }
     
-    // Парсинг из плоских ключей order[name], order[email]
     Object.keys(obj).forEach((key) => {
       if (key.startsWith('order[') && key.endsWith(']')) {
         const field = key.slice(6, -1);

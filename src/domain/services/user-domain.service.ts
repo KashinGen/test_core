@@ -7,7 +7,6 @@ export class UserDomainService {
     if (user.isBlocked || user.isDeleted) {
       return false;
     }
-    // Дополнительная бизнес-логика проверки ролей
     return true;
   }
 

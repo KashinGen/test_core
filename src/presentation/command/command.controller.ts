@@ -60,7 +60,6 @@ export class CommandController {
       ),
     );
     
-    // Возвращаем созданный аккаунт в Hydra формате
     const account = await this.queryBus.execute(
       new GetUserByIdQuery(result.id, user.id, user.roles),
     );
@@ -70,15 +69,12 @@ export class CommandController {
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @RequireRoles(Role.ROLE_PLATFORM_ACCOUNT_RW, Role.ROLE_PLATFORM_ADMIN)
-  // SelfOrRolesGuard заменяет RolesGuard для этого метода, разрешая self-update
-  // Детальная проверка прав (ограничения для self-update) выполняется в UpdateAccountHandler
   @UseGuards(SelfOrRolesGuard)
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateAccountDto,
     @CurrentUser() user: RequestUser,
   ) {
-    // Если передан password, нужно его захешировать
     let passwordHash: string | undefined;
     if (dto.password) {
       const bcrypt = await import('bcrypt');
@@ -98,7 +94,6 @@ export class CommandController {
       ),
     );
 
-    // Возвращаем обновленный аккаунт в Hydra формате
     const account = await this.queryBus.execute(
       new GetUserByIdQuery(result.id, user.id, user.roles),
     );
@@ -114,15 +109,15 @@ export class CommandController {
 
   @Post('password/reset')
   @HttpCode(HttpStatus.ACCEPTED)
-  @Public() // Публичный endpoint - не требует JWT
-  async resetPassword(@Body() dto: ResetAccountPasswordDto) {
-    return this.commandBus.execute(new ResetAccountPasswordCommand(dto.email));
+  @Public()
+  async resetPassword(@Body() dto: ResetAccountPasswordDto): Promise<void> {
+    await this.commandBus.execute(new ResetAccountPasswordCommand(dto.email));
   }
 
   @Post('password/change')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Public() // Публичный endpoint - не требует JWT (использует токен сброса)
-  async changePassword(@Body() dto: ChangeAccountPasswordDto) {
+  @Public()
+  async changePassword(@Body() dto: ChangeAccountPasswordDto): Promise<void> {
     await this.commandBus.execute(
       new ChangeAccountPasswordCommand(dto.token, dto.password),
     );
@@ -158,7 +153,9 @@ export class CommandController {
     @Body('roles') roles: string[],
     @CurrentUser() user: RequestUser,
   ) {
-    await this.commandBus.execute(new GrantRoleCommand(id, roles));
+    await this.commandBus.execute(
+      new GrantRoleCommand(id, roles, user.id, user.roles),
+    );
     const account = await this.queryBus.execute(
       new GetUserByIdQuery(id, user.id, user.roles),
     );

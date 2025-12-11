@@ -21,11 +21,6 @@ export class GetUserByIdHandler implements IQueryHandler<GetUserByIdQuery> {
       throw new NotFoundException('Account not found');
     }
 
-    // Базовая проверка ролей выполняется на уровне контроллера через RolesGuard
-    // Здесь проверяем только бизнес-логику: право владельца читать себя
-    
-    // RequesterId опционален для этого query (может быть вызван без аутентификации в некоторых случаях)
-    // Но если передан, проверяем права
     if (query.requesterId && query.requesterRoles && query.requesterRoles.length > 0) {
       const requester = {
         id: query.requesterId,

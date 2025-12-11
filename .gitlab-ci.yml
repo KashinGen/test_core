@@ -1,0 +1,20 @@
+include:
+  - project: 'devops/ci-templates/cms-instance'
+    ref: master
+    file:
+      - 'ci/build.yaml'
+      - 'ci/workflow_custom.yaml'
+      #- 'ci/deploy-box.yaml'
+      - 'ci/deploy-dev.yaml'
+      - 'ci/deploy-stage.yaml'
+      - 'ci/deploy-prod.yaml'
+
+variables:
+  APPLICATION_TYPE: amp-core
+  HELM_DEFAULT_VALUES_PATH: cms-instance/templates/chart
+  HELM_INSTANCE_VALUES_PATH: cms-instance/instances/rg
+  KUBECONTEXT_DEVELOP: agency/frankfurt-gitlab-agent:bmm-stage
+  KUBECONTEXT_STAGE: agency/frankfurt-gitlab-agent:bmm-stage
+  KUBECONTEXT_PROD: agency/frankfurt-gitlab-agent:rg-prod
+  DEV_DOMAIN: core.rg.dev.bemymedia.dev
+  CLUSTER_NAMESPACE: rg

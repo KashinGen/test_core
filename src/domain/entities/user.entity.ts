@@ -100,6 +100,10 @@ export class User extends AggregateRoot<IEvent> {
     this._id = event.id;
     this._name = event.name;
     this._email = event.email;
+    // Добавьте проверку
+    if (!event.hash) {
+      throw new Error(`UserCreatedEvent for user ${event.id} is missing hash`);
+    }
     this._passwordHash = event.hash;
     this._roles = event.roles;
     this._sources = event.sources;

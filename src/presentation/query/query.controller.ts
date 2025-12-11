@@ -23,8 +23,6 @@ export class QueryController {
 
   @Get(':id')
   async getOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
-    // Проверка прав выполняется в GetUserByIdHandler
-    // Владелец может читать себя, остальные требуют ROLE_PLATFORM_ACCOUNT_RO
     const account = await this.queryBus.execute(
       new GetUserByIdQuery(id, user.id, user.roles),
     );

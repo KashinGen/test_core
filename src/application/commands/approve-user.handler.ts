@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler, EventPublisher } from '@nestjs/cqrs';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, Inject } from '@nestjs/common';
 import { ApproveUserCommand } from './approve-user.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
 import { UserDomainService } from '@domain/services/user-domain.service';
@@ -8,6 +8,7 @@ import { User } from '@domain/entities/user.entity';
 @CommandHandler(ApproveUserCommand)
 export class ApproveUserHandler implements ICommandHandler<ApproveUserCommand> {
   constructor(
+    @Inject('IUserRepository')
     private readonly repo: IUserRepository,
     private readonly domainService: UserDomainService,
     private readonly publisher: EventPublisher,
@@ -31,5 +32,7 @@ export class ApproveUserHandler implements ICommandHandler<ApproveUserCommand> {
     return { ok: true };
   }
 }
+
+
 
 

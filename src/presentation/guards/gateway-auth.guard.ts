@@ -34,7 +34,6 @@ export class GatewayAuthGuard implements CanActivate {
   }
 
   canActivate(context: ExecutionContext): boolean {
-    // Проверяем, является ли endpoint публичным
     const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLIC_ENDPOINT_KEY, [
       context.getHandler(),
       context.getClass(),

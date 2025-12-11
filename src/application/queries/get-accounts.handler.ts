@@ -10,7 +10,6 @@ export class GetAccountsHandler implements IQueryHandler<GetAccountsQuery> {
   constructor(private readonly readModel: UserReadModelRepository) {}
 
   async execute(query: GetAccountsQuery): Promise<FindAllResult> {
-    // Проверка авторизации выполняется на уровне контроллера через RolesGuard
     this.logger.debug(`Fetching accounts list: page=${query.page}, perPage=${query.perPage}`);
 
     return this.readModel.findAll(

@@ -19,3 +19,6 @@ export class GetAccountsQuery implements IQuery {
   ) {}
 }
 
+
+
+

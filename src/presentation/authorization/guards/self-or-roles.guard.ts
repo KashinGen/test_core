@@ -60,7 +60,6 @@ export class SelfOrRolesGuard extends BaseAuthGuard implements CanActivate {
       return true;
     }
 
-    // Если не self-update, проверяем роли
     const hasRole = requiredRoles.some((role) => user.roles.includes(role));
     if (!hasRole) {
       this.logger.warn(

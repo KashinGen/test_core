@@ -18,7 +18,7 @@ export class HydraMapper {
       roles: account.roles || [],
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,
-      sources: account.sources || [], // Всегда массив, не null/undefined
+      sources: account.sources || [],
     };
   }
 

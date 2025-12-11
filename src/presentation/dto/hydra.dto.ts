@@ -23,3 +23,6 @@ export interface HydraCollection {
   'hydra:view': HydraCollectionView;
 }
 
+
+
+

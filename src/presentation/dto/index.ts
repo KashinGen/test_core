@@ -6,5 +6,7 @@ export * from './reset-account-password.dto';
 export * from './change-account-password.dto';
 export * from './hydra.dto';
 export * from './access-check.dto';
+export * from './auth-email.dto';
+export * from './auth-refresh.dto';
 
 

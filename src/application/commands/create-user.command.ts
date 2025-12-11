@@ -12,7 +12,6 @@ export class CreateAccountCommand implements ICommand {
   ) {}
 }
 
-// Обратная совместимость
 export class CreateUserCommand extends CreateAccountCommand {
   constructor(
     email: string,

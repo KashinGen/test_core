@@ -1,30 +1,62 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, Inject, Logger } from '@nestjs/common';
 import { ResetAccountPasswordCommand } from './reset-account-password.command';
 import { IUserRepository } from '@domain/repositories/user-repository.interface';
-import { v4 as uuid } from 'uuid';
+import { PasswordResetRepository } from '@infrastructure/repos/password-reset.repository';
+import { NotificationService } from '@infrastructure/services/notification.service';
+import { PasswordResetEntity } from '@infrastructure/entities/password-reset.entity';
+import { randomBytes } from 'crypto';
 
 @CommandHandler(ResetAccountPasswordCommand)
 export class ResetAccountPasswordHandler
   implements ICommandHandler<ResetAccountPasswordCommand>
 {
-  constructor(private readonly repo: IUserRepository) {}
+  private readonly logger = new Logger(ResetAccountPasswordHandler.name);
+  private readonly TOKEN_LIFETIME_HOURS = 1;
 
-  async execute(command: ResetAccountPasswordCommand): Promise<{ token: string }> {
+  constructor(
+    @Inject('IUserRepository')
+    private readonly repo: IUserRepository,
+    private readonly passwordResetRepo: PasswordResetRepository,
+    private readonly notificationService: NotificationService,
+  ) {}
+
+  async execute(command: ResetAccountPasswordCommand): Promise<void> {
     const user = await this.repo.findByEmail(command.email);
     if (!user || user.isDeleted) {
-      // Не раскрываем, существует ли пользователь
-      throw new NotFoundException('Account not found');
+      return;
     }
 
-    // Генерируем токен для сброса пароля
-    // В реальном проекте нужно сохранить токен в БД с TTL
-    const token = uuid();
+    const hasActive = await this.passwordResetRepo.hasActivePasswordReset(
+      user.id,
+      this.TOKEN_LIFETIME_HOURS,
+    );
+    if (hasActive) {
+      return;
+    }
 
-    // TODO: Сохранить токен в Redis или БД с TTL (например, 1 час)
-    // await this.tokenStore.save(token, user.id, 3600);
+    const token = this.generateToken();
 
-    return { token };
+    const passwordReset = new PasswordResetEntity();
+    passwordReset.accountId = user.id;
+    passwordReset.token = token;
+    await this.passwordResetRepo.save(passwordReset);
+
+    this.notificationService
+      .sendPasswordResetEmail(user.email, user.name, token)
+      .then(() => {
+        this.passwordResetRepo.markAsNotified(token).catch((err) => {
+          this.logger.error('Failed to mark token as notified', err);
+        });
+      })
+      .catch((err) => {
+        this.logger.error('Failed to send password reset email', err);
+      });
+  }
+
+  private generateToken(): string {
+    return randomBytes(32).toString('hex');
   }
 }
+
 

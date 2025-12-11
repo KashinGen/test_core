@@ -12,7 +12,7 @@ export class InternalController {
   constructor(private readonly permissionRepo: PermissionRepository) {}
 
   @Post('access-check')
-  @Public() // Явно помечаем как публичный (не требует JWT, только gateway auth)
+  @Public()
   async check(@Body() body: AccessCheckDto) {
     const { userId, action, resource } = body;
     const allowed = await this.permissionRepo.check(userId, action, resource);
@@ -20,5 +20,6 @@ export class InternalController {
     return { allowed, permissions };
   }
 }
+
 
 

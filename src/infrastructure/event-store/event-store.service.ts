@@ -1,13 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventEntity } from './event.entity';
 import { IEvent, AggregateRoot } from '@nestjs/cqrs';
 import { User } from '@domain/entities/user.entity';
+import {
+  UserCreatedEvent,
+  UserApprovedEvent,
+  UserBlockedEvent,
+  RoleGrantedEvent,
+  PasswordChangedEvent,
+  UserUpdatedEvent,
+  UserDeletedEvent,
+} from '@domain/events';
 
 @Injectable()
 export class EventStoreService {
+  private readonly logger = new Logger(EventStoreService.name);
+
   constructor(
     @InjectRepository(EventEntity)
     private readonly eventRepository: Repository<EventEntity>,
@@ -75,6 +86,96 @@ export class EventStoreService {
   }
 
   private deserializeEvent(eventEntity: EventEntity): IEvent {
-    return eventEntity.payload as IEvent;
+    const payload = eventEntity.payload as any;
+    switch (eventEntity.eventType) {
+      case 'UserCreatedEvent':
+        const hash = payload.hash;
+        if (!hash) {
+          this.logger.error(
+            'UserCreatedEvent deserialization - hash is missing:',
+            {
+              id: payload.id,
+              email: payload.email,
+              payloadKeys: Object.keys(payload),
+              fullPayload: JSON.stringify(payload),
+            },
+          );
+        } else {
+          this.logger.debug('UserCreatedEvent deserialized successfully', {
+            id: payload.id,
+            email: payload.email,
+            hashPrefix: hash.substring(0, 10),
+            hashLength: hash.length,
+          });
+        }
+        return Object.assign(
+          new UserCreatedEvent(
+            payload.id,
+            payload.name,
+            payload.email,
+            hash,
+            payload.roles,
+            payload.sources,
+            payload.createdAt ? new Date(payload.createdAt) : new Date(),
+          ),
+          payload,
+        );
+      case 'UserApprovedEvent':
+        return Object.assign(
+          new UserApprovedEvent(
+            payload.id,
+            payload.approvedAt ? new Date(payload.approvedAt) : new Date(),
+          ),
+          payload,
+        );
+      case 'UserBlockedEvent':
+        return Object.assign(
+          new UserBlockedEvent(
+            payload.id,
+            payload.blockedAt ? new Date(payload.blockedAt) : new Date(),
+          ),
+          payload,
+        );
+      case 'RoleGrantedEvent':
+        return Object.assign(
+          new RoleGrantedEvent(
+            payload.id,
+            payload.roles,
+            payload.grantedAt ? new Date(payload.grantedAt) : new Date(),
+          ),
+          payload,
+        );
+      case 'PasswordChangedEvent':
+        return Object.assign(
+          new PasswordChangedEvent(
+            payload.id,
+            payload.hash,
+            payload.changedAt ? new Date(payload.changedAt) : new Date(),
+          ),
+          payload,
+        );
+      case 'UserUpdatedEvent':
+        return Object.assign(
+          new UserUpdatedEvent(
+            payload.id,
+            payload.name,
+            payload.email,
+            payload.roles,
+            payload.sources,
+            payload.updatedAt ? new Date(payload.updatedAt) : new Date(),
+          ),
+          payload,
+        );
+      case 'UserDeletedEvent':
+        return Object.assign(
+          new UserDeletedEvent(
+            payload.id,
+            payload.deletedAt ? new Date(payload.deletedAt) : new Date(),
+          ),
+          payload,
+        );
+      default:
+        return payload as IEvent;
+    }
   }
 }
