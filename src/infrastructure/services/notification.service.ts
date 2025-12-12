@@ -50,8 +50,13 @@ export class NotificationService {
         this.configService.get<string>('NOTIFICATIONS_INTEGRATION_ID') ||
         this.configService.get<string>('INTEGRATION_ID');
 
-      const htmlContent = this.generateHtmlEmail(title, emailBody, resetUrl, token);
-      
+      const htmlContent = this.generateHtmlEmail(
+        title,
+        emailBody,
+        resetUrl,
+        token,
+      );
+
       // Формат для notification service через ClientProxy напрямую
       // TcpClientHelper в gateway добавляет integration автоматически, но мы используем ClientProxy напрямую
       const payload = {
@@ -82,7 +87,10 @@ export class NotificationService {
 
       this.logger.log(`Password reset email sent to ${email}`);
     } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${email}`, error);
+      this.logger.error(
+        `Failed to send password reset email to ${email}`,
+        error,
+      );
       // Не бросаем ошибку, чтобы не блокировать процесс
       // В production можно добавить retry механизм или очередь
     }
@@ -120,4 +128,3 @@ export class NotificationService {
     `;
   }
 }
-

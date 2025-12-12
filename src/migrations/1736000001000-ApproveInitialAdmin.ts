@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Однократная миграция: апрувит первого администратора (ADMIN_EMAIL) событием UserApprovedEvent.
+ * Однократная миграция: апрувит первого администратора (ADMIN_EMAIL).
  * Если админ не найден — миграция пропускается.
  */
 export class ApproveInitialAdmin1736000001000 implements MigrationInterface {
@@ -9,12 +9,7 @@ export class ApproveInitialAdmin1736000001000 implements MigrationInterface {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
 
     const rows = await queryRunner.query(
-      `SELECT "aggregateId" as id, "version"
-         FROM events
-        WHERE "eventType" = 'UserCreatedEvent'
-          AND payload->>'email' = $1
-        ORDER BY "version" DESC
-        LIMIT 1`,
+      `SELECT id FROM users WHERE email = $1 AND "deletedAt" IS NULL LIMIT 1`,
       [adminEmail],
     );
 
@@ -23,30 +18,20 @@ export class ApproveInitialAdmin1736000001000 implements MigrationInterface {
       return;
     }
 
-    const { id, version } = rows[0];
-    const nextVersion = (Number(version) || 1) + 1;
-    const approvedAt = new Date().toISOString();
+    const { id } = rows[0];
 
     await queryRunner.query(
-      `INSERT INTO events ("aggregateId","eventType",payload,version,"createdAt")
-       VALUES ($1,'UserApprovedEvent',$2,$3,now())`,
-      [id, JSON.stringify({ id, approvedAt }), nextVersion],
+      `UPDATE users SET approved = true, "updatedAt" = NOW() WHERE id = $1`,
+      [id],
     );
 
-    console.log(`Admin ${adminEmail} approved with version ${nextVersion}`);
+    console.log(`Admin ${adminEmail} (${id}) approved`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
     await queryRunner.query(
-      `DELETE FROM events
-        WHERE "eventType"='UserApprovedEvent'
-          AND payload->>'id' IN (
-            SELECT "aggregateId"
-              FROM events
-             WHERE "eventType"='UserCreatedEvent'
-               AND payload->>'email'=$1
-          )`,
+      `UPDATE users SET approved = false, "updatedAt" = NOW() WHERE email = $1`,
       [adminEmail],
     );
   }

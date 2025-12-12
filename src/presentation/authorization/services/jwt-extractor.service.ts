@@ -93,10 +93,16 @@ export class JwtExtractorService {
       }
 
       const userId = decoded.id || decoded.sub;
+      const email = decoded.email;
       const roles: Role[] = decoded.roles || [];
 
       if (!userId) {
         this.logger.debug('JWT token missing user id');
+        return null;
+      }
+
+      if (!email) {
+        this.logger.warn('JWT token missing user email');
         return null;
       }
 
@@ -112,6 +118,7 @@ export class JwtExtractorService {
 
       return {
         id: userId,
+        email,
         roles: validRoles,
       };
     } catch (error) {

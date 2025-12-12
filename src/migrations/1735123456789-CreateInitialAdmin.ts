@@ -12,16 +12,16 @@ export class CreateInitialAdmin1735123456789 implements MigrationInterface {
     const adminName = process.env.ADMIN_NAME || 'System Administrator';
     const adminId = process.env.ADMIN_ID || randomUUID();
 
-    const tableExists = await queryRunner.hasTable('events');
+    const tableExists = await queryRunner.hasTable('users');
     if (!tableExists) {
       throw new Error(
-        'Таблица events не найдена. Убедитесь, что базовая миграция выполнена.',
+        'Таблица users не найдена. Убедитесь, что базовая миграция выполнена.',
       );
     }
 
     const existingUser = await queryRunner.query(
-      `SELECT 1 FROM events WHERE "eventType" = $1 AND payload->>'email' = $2 LIMIT 1`,
-      ['UserCreatedEvent', adminEmail],
+      `SELECT id FROM users WHERE email = $1 AND "deletedAt" IS NULL LIMIT 1`,
+      [adminEmail],
     );
 
     if (existingUser && existingUser.length > 0) {
@@ -32,24 +32,45 @@ export class CreateInitialAdmin1735123456789 implements MigrationInterface {
     }
 
     const passwordHash = await bcrypt.hash(adminPassword, 12);
-
-    const payload = {
-      id: adminId,
-      name: adminName,
-      email: adminEmail,
-      hash: passwordHash,
-      roles: ['ROLE_PLATFORM_ADMIN'],
-      sources: [],
-      createdAt: new Date().toISOString(),
-    };
-
     const createdAt = new Date();
 
     await queryRunner.query(
-      `INSERT INTO events ("aggregateId", "eventType", payload, version, "createdAt")
-       VALUES ($1, $2, $3, $4, $5)`,
-      [adminId, 'UserCreatedEvent', JSON.stringify(payload), 1, createdAt],
+      `INSERT INTO users (id, name, email, password_hash, roles, sources, approved, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        adminId,
+        adminName,
+        adminEmail,
+        passwordHash,
+        'ROLE_PLATFORM_ADMIN',
+        '',
+        true,
+        createdAt,
+        createdAt,
+      ],
     );
+
+    // Добавляем запись в audit_logs, если таблица существует
+    const auditLogsTableExists = await queryRunner.hasTable('audit_logs');
+    if (auditLogsTableExists) {
+      await queryRunner.query(
+        `INSERT INTO audit_logs (id, "entityType", "entityId", action, "userId", "userEmail", "newValues", description, "createdAt")
+         VALUES (uuid_generate_v4(), 'user', $1, 'CREATE', $1, $2, $3, $4, $5)`,
+        [
+          adminId,
+          adminEmail,
+          JSON.stringify({
+            name: adminName,
+            email: adminEmail,
+            roles: ['ROLE_PLATFORM_ADMIN'],
+            sources: [],
+            approved: true,
+          }),
+          'Initial admin created by migration',
+          createdAt,
+        ],
+      );
+    }
 
     console.log('Первый администратор успешно создан!');
     console.log(`  ID: ${adminId}`);
@@ -61,10 +82,10 @@ export class CreateInitialAdmin1735123456789 implements MigrationInterface {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
 
     await queryRunner.query(
-      `DELETE FROM events WHERE "eventType" = $1 AND payload->>'email' = $2`,
-      ['UserCreatedEvent', adminEmail],
+      `UPDATE users SET "deletedAt" = NOW() WHERE email = $1`,
+      [adminEmail],
     );
 
-    console.log(`Администратор с email ${adminEmail} удален из event store.`);
+    console.log(`Администратор с email ${adminEmail} помечен как удаленный.`);
   }
 }

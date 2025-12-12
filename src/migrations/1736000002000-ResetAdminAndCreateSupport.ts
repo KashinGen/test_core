@@ -6,19 +6,11 @@ export class ResetAdminAndCreateSupport1736000002000 implements MigrationInterfa
   public async up(queryRunner: QueryRunner): Promise<void> {
     const oldAdminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
 
-    const oldAdmins: Array<{ aggregateId: string }> = await queryRunner.query(
-      `SELECT DISTINCT "aggregateId"
-         FROM events
-        WHERE "eventType" = 'UserCreatedEvent'
-          AND payload->>'email' = $1`,
+    // Удаляем старых админов из таблицы users
+    await queryRunner.query(
+      `UPDATE users SET "deletedAt" = NOW() WHERE email = $1`,
       [oldAdminEmail],
     );
-
-    for (const row of oldAdmins) {
-      await queryRunner.query(`DELETE FROM events WHERE "aggregateId" = $1`, [
-        row.aggregateId,
-      ]);
-    }
 
     const adminEmail = 'support@rg.org';
     const adminPassword =
@@ -31,21 +23,54 @@ export class ResetAdminAndCreateSupport1736000002000 implements MigrationInterfa
     const passwordHash = await bcrypt.hash(adminPassword, 12);
     const createdAt = new Date();
 
-    const payload = {
-      id: adminId,
-      name: adminName,
-      email: adminEmail,
-      hash: passwordHash,
-      roles: ['ROLE_PLATFORM_ADMIN'],
-      sources: [],
-      createdAt: createdAt.toISOString(),
-    };
+    // Проверяем, существует ли уже пользователь
+    const existing = await queryRunner.query(
+      `SELECT id FROM users WHERE email = $1 AND "deletedAt" IS NULL`,
+      [adminEmail],
+    );
+
+    if (existing && existing.length > 0) {
+      console.log(`User with email ${adminEmail} already exists. Skipping creation.`);
+      return;
+    }
 
     await queryRunner.query(
-      `INSERT INTO events ("aggregateId", "eventType", payload, version, "createdAt")
-       VALUES ($1, $2, $3, $4, $5)`,
-      [adminId, 'UserCreatedEvent', JSON.stringify(payload), 1, createdAt],
+      `INSERT INTO users (id, name, email, password_hash, roles, sources, approved, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        adminId,
+        adminName,
+        adminEmail,
+        passwordHash,
+        'ROLE_PLATFORM_ADMIN',
+        '',
+        true,
+        createdAt,
+        createdAt,
+      ],
     );
+
+    // Добавляем запись в audit_logs, если таблица существует
+    const auditLogsTableExists = await queryRunner.hasTable('audit_logs');
+    if (auditLogsTableExists) {
+      await queryRunner.query(
+        `INSERT INTO audit_logs (id, "entityType", "entityId", action, "userId", "userEmail", "newValues", description, "createdAt")
+         VALUES (uuid_generate_v4(), 'user', $1, 'CREATE', $1, $2, $3, $4, $5)`,
+        [
+          adminId,
+          adminEmail,
+          JSON.stringify({
+            name: adminName,
+            email: adminEmail,
+            roles: ['ROLE_PLATFORM_ADMIN'],
+            sources: [],
+            approved: true,
+          }),
+          'Initial admin created by migration',
+          createdAt,
+        ],
+      );
+    }
 
     console.log(
       `Support admin created: email=${adminEmail}, password=${adminPassword}, id=${adminId}`,
@@ -55,12 +80,7 @@ export class ResetAdminAndCreateSupport1736000002000 implements MigrationInterfa
   public async down(queryRunner: QueryRunner): Promise<void> {
     const adminEmail = 'support@rg.org';
     await queryRunner.query(
-      `DELETE FROM events
-        WHERE "aggregateId" IN (
-          SELECT DISTINCT "aggregateId"
-            FROM events
-           WHERE payload->>'email' = $1
-        )`,
+      `UPDATE users SET "deletedAt" = NOW() WHERE email = $1`,
       [adminEmail],
     );
   }

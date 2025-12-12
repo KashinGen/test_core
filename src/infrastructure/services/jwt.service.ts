@@ -39,6 +39,7 @@ function parseJwtKey(key: string): string {
 
 export interface TokenPayload {
   id: string;
+  email: string;
   roles: Role[];
   type: 'access' | 'refresh';
 }
@@ -85,9 +86,9 @@ export class JwtService {
     this.refreshTokenExpiresIn = refreshExp as jwt.SignOptions['expiresIn'];
   }
 
-  generateTokenPair(userId: string, roles: Role[]): TokenPair {
-    const accessToken = this.generateAccessToken(userId, roles);
-    const refreshToken = this.generateRefreshToken(userId, roles);
+  generateTokenPair(userId: string, email: string, roles: Role[]): TokenPair {
+    const accessToken = this.generateAccessToken(userId, email, roles);
+    const refreshToken = this.generateRefreshToken(userId, email, roles);
 
     return {
       accessToken,
@@ -95,9 +96,10 @@ export class JwtService {
     };
   }
 
-  generateAccessToken(userId: string, roles: Role[]): string {
+  generateAccessToken(userId: string, email: string, roles: Role[]): string {
     const payload: TokenPayload = {
       id: userId,
+      email,
       roles,
       type: 'access',
     };
@@ -110,9 +112,10 @@ export class JwtService {
     return jwt.sign(payload, this.jwtPrivateKey, options);
   }
 
-  generateRefreshToken(userId: string, roles: Role[]): string {
+  generateRefreshToken(userId: string, email: string, roles: Role[]): string {
     const payload: TokenPayload = {
       id: userId,
+      email,
       roles,
       type: 'refresh',
     };

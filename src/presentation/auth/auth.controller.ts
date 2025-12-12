@@ -5,12 +5,11 @@ import {
   HttpCode,
   HttpStatus,
   UnauthorizedException,
-  Inject,
   Logger,
 } from '@nestjs/common';
 import { AuthEmailDto } from '../dto/auth-email.dto';
 import { AuthRefreshDto } from '../dto/auth-refresh.dto';
-import { IUserRepository } from '@domain/repositories/user-repository.interface';
+import { UserService } from '@infrastructure/services/user.service';
 import { JwtService } from '@infrastructure/services/jwt.service';
 import { Public } from '../guards/gateway-auth.guard';
 import { Role } from '../authorization/roles.enum';
@@ -21,8 +20,7 @@ export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
   constructor(
-    @Inject('IUserRepository')
-    private readonly userRepository: IUserRepository,
+    private readonly userService: UserService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -30,7 +28,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Public()
   async authByEmail(@Body() dto: AuthEmailDto) {
-    const user = await this.userRepository.findByEmail(dto.email);
+    const user = await this.userService.findByEmail(dto.email);
 
     if (!user) {
       this.logger.warn(
@@ -39,14 +37,14 @@ export class AuthController {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    if (user.isDeleted) {
+    if (user.deletedAt) {
       this.logger.warn(
         `Authentication failed: account deleted for user ${user.id}`,
       );
       throw new UnauthorizedException('Account is deleted');
     }
 
-    if (user.isBlocked) {
+    if (user.blockedAt) {
       this.logger.warn(
         `Authentication failed: account blocked for user ${user.id}`,
       );
@@ -56,23 +54,10 @@ export class AuthController {
     // Проверка наличия passwordHash и пароля
     if (!user.passwordHash || !dto.password) {
       this.logger.error(
-        `Authentication failed: missing password hash or password`,
-        {
-          userId: user.id,
-          email: user.email,
-          hasPasswordHash: !!user.passwordHash,
-          passwordHashType: typeof user.passwordHash,
-          passwordHashLength: user.passwordHash?.length,
-          hasPassword: !!dto.password,
-        },
+        `Authentication failed: missing password hash or password for user ${user.id}`,
       );
       throw new UnauthorizedException('Invalid email or password');
     }
-
-    this.logger.debug(`Attempting password comparison for user ${user.id}`, {
-      email: user.email,
-      passwordHashPrefix: user.passwordHash.substring(0, 10),
-    });
 
     const isPasswordValid = await bcrypt.compare(
       dto.password,
@@ -90,7 +75,7 @@ export class AuthController {
       Object.values(Role).includes(r as Role),
     );
 
-    const tokenPair = this.jwtService.generateTokenPair(user.id, roles);
+    const tokenPair = this.jwtService.generateTokenPair(user.id, user.email, roles);
 
     return {
       access_token: tokenPair.accessToken,
@@ -109,17 +94,17 @@ export class AuthController {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    const user = await this.userRepository.findById(payload.id);
+    const user = await this.userService.findById(payload.id);
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    if (user.isDeleted) {
+    if (user.deletedAt) {
       throw new UnauthorizedException('Account is deleted');
     }
 
-    if (user.isBlocked) {
+    if (user.blockedAt) {
       throw new UnauthorizedException('Account is blocked');
     }
 
@@ -128,7 +113,7 @@ export class AuthController {
       Object.values(Role).includes(r as Role),
     );
 
-    const tokenPair = this.jwtService.generateTokenPair(user.id, roles);
+    const tokenPair = this.jwtService.generateTokenPair(user.id, user.email, roles);
 
     return {
       access_token: tokenPair.accessToken,
